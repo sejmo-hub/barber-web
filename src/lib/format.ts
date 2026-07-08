@@ -8,6 +8,28 @@ export function formatEur(cents: number): string {
   }).format(cents / 100);
 }
 
+/** Kompaktná cena bez zbytočných desatinných (2500 → "25 €", 2550 → "25,50 €"). */
+export function formatEurCompact(cents: number): string {
+  return new Intl.NumberFormat("sk-SK", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
+/**
+ * Cena služby: fixná ("10,00 €") alebo rozsah ("od 25 € do 60 €"), podľa toho,
+ * či je priceMaxCents vyplnené.
+ */
+export function formatServicePrice(
+  priceCents: number,
+  priceMaxCents: number | null,
+): string {
+  if (priceMaxCents == null) return formatEur(priceCents);
+  return `od ${formatEurCompact(priceCents)} do ${formatEurCompact(priceMaxCents)}`;
+}
+
 /** minúty od polnoci (napr. 540) → "09:00" */
 export function minutesToHHMM(min: number): string {
   const h = Math.floor(min / 60);

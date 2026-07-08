@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatEur, WEEKDAYS, hhmmToMinutes } from "@/lib/format";
+import { formatServicePrice, WEEKDAYS, hhmmToMinutes } from "@/lib/format";
 import {
   formatDateOnly,
   formatDateInputUTC,
@@ -11,11 +11,16 @@ import {
 import { computeFreeSlots } from "@/lib/slots";
 import { BookingForm } from "./booking-form";
 
-// Dočasná verejná stránka = booking flow (KROK 1: výber služby, KROK 2: deň,
-// KROK 3: zobrazenie voľných slotov). Pekný hlavný dizajn príde samostatne.
-// Kroky sú riešené cez query params (?service=&date=), takže sú to obyčajné
-// odkazy – jednoduché a funkčné aj bez JS.
+// Verejný booking flow (KROK 1: výber služby, KROK 2: deň, KROK 3: sloty,
+// KROK 4: údaje). Kroky cez query params (?service=&date=&slot=) → obyčajné
+// odkazy, funguje aj bez JS. Tmavý brand konzistentný s hlavnou stránkou.
 export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Rezervácia",
+  description:
+    "Rezervuj si termín v Simon's The Barber v Kuklove — vyber službu, deň a voľný čas.",
+};
 
 const DAYS_AHEAD = 14;
 
@@ -26,15 +31,16 @@ export default async function BookingPage({
 }) {
   const sp = await searchParams;
 
+  // Len rezervovateľné služby – nerezervovateľné (napr. farbenie s cenovým
+  // rozsahom) sa v rezervačnom toku nezobrazujú.
   const services = await prisma.service.findMany({
-    where: { active: true },
+    where: { active: true, bookable: true },
     orderBy: { name: "asc" },
   });
   const service = sp.service
     ? services.find((s) => s.id === sp.service)
     : undefined;
 
-  // Predpočítaj dni a sloty (len keď je vybraná služba).
   const dayCells: {
     dateStr: string;
     label: string;
@@ -53,7 +59,6 @@ export default async function BookingPage({
     );
     const today = todayLocalStartUTC();
     for (let i = 0; i < DAYS_AHEAD; i++) {
-      // UTC aritmetika: +1 deň = presne ďalšia UTC polnoc (kotva kal. dňa).
       const d = new Date(today.getTime() + i * 86_400_000);
       const dateStr = formatDateInputUTC(d);
       const wd = isoWeekdayUTC(d);
@@ -67,42 +72,66 @@ export default async function BookingPage({
     selectedDate = sp.date ? localDateStringToUTC(sp.date) : null;
     if (selectedDate) {
       slots = await computeFreeSlots(service.durationMin, selectedDate);
-      // Slot považujeme za vybraný, ak je to platný HH:MM (autoritatívnu
-      // kontrolu voľnosti robí až server action pri odoslaní).
       selectedSlot =
         sp.slot && hhmmToMinutes(sp.slot) !== null ? sp.slot : null;
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-2xl space-y-8 px-4 py-10">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">Rezervácia</h1>
-          <p className="text-sm text-gray-500">
-            Vyber si službu, deň a voľný termín.
-          </p>
-        </header>
+    <div className="min-h-screen bg-ink text-cream">
+      {/* Hlavička konzistentná s hlavnou stránkou */}
+      <header className="sticky top-0 z-40 border-b border-line bg-ink/80 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
+          <Link href="/" aria-label="Simon The Barber — domov" className="leading-none">
+            <span className="block font-display text-xl uppercase leading-none text-cream">
+              Simon
+            </span>
+            <span className="mt-0.5 block font-mono text-[8px] uppercase tracking-[0.35em] text-muted">
+              <span className="text-gold">The</span> Barber
+            </span>
+          </Link>
+          <Link
+            href="/"
+            className="font-mono text-xs uppercase tracking-widest text-muted transition-colors hover:text-gold"
+          >
+            ← Späť na hlavnú
+          </Link>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-2xl space-y-10 px-4 py-10">
+        <div>
+          <span className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
+            Rezervácia
+          </span>
+          <h1 className="mt-2 font-display text-4xl uppercase leading-none text-cream sm:text-5xl">
+            Vyber si termín
+          </h1>
+        </div>
 
         {/* KROK 1 – výber služby */}
         {!service ? (
-          <section className="space-y-3">
-            <h2 className="text-sm font-medium text-gray-500">1 · Služba</h2>
+          <section className="space-y-4">
+            <h2 className="font-mono text-xs uppercase tracking-widest text-gold">
+              01 · Služba
+            </h2>
             {services.length === 0 ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted">
                 Momentálne nie sú dostupné žiadne služby.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {services.map((s) => (
                   <li key={s.id}>
                     <Link
-                      href={`/?service=${s.id}`}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 hover:border-gray-400"
+                      href={`/rezervacia?service=${s.id}`}
+                      className="group flex items-center justify-between rounded-sm border border-line bg-panel px-5 py-4 transition-colors duration-300 hover:border-gold/60"
                     >
-                      <span className="font-medium">{s.name}</span>
-                      <span className="text-sm text-gray-500">
-                        {s.durationMin} min · {formatEur(s.priceCents)}
+                      <span className="font-display text-xl uppercase text-cream">
+                        {s.name}
+                      </span>
+                      <span className="font-mono text-sm text-muted transition-colors group-hover:text-gold">
+                        {s.durationMin} min · {formatServicePrice(s.priceCents, s.priceMaxCents)}
                       </span>
                     </Link>
                   </li>
@@ -113,36 +142,41 @@ export default async function BookingPage({
         ) : (
           <>
             {/* Zhrnutie vybranej služby */}
-            <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <section className="flex items-center justify-between rounded-sm border border-line bg-panel px-5 py-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400">
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
                   Služba
                 </p>
-                <p className="font-medium">
+                <p className="mt-1 font-medium text-cream">
                   {service.name} · {service.durationMin} min ·{" "}
-                  {formatEur(service.priceCents)}
+                  <span className="text-gold">{formatServicePrice(service.priceCents, service.priceMaxCents)}</span>
                 </p>
               </div>
-              <Link href="/" className="text-sm text-gray-500 hover:underline">
+              <Link
+                href="/rezervacia"
+                className="font-mono text-xs uppercase tracking-widest text-muted transition-colors hover:text-gold"
+              >
                 Zmeniť
               </Link>
             </section>
 
             {/* KROK 2 – výber dňa */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-medium text-gray-500">2 · Deň</h2>
+            <section className="space-y-4">
+              <h2 className="font-mono text-xs uppercase tracking-widest text-gold">
+                02 · Deň
+              </h2>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {dayCells.map((c) =>
                   c.available ? (
                     <Link
                       key={c.dateStr}
-                      href={`/?service=${service.id}&date=${c.dateStr}`}
+                      href={`/rezervacia?service=${service.id}&date=${c.dateStr}`}
                       aria-current={c.selected ? "true" : undefined}
                       className={
-                        "rounded-md border px-3 py-2 text-center text-sm transition-colors " +
+                        "rounded-sm border px-3 py-2 text-center text-sm transition-colors " +
                         (c.selected
-                          ? "border-gray-900 bg-gray-900 text-white"
-                          : "border-gray-300 bg-white text-gray-800 hover:border-gray-500")
+                          ? "border-gold bg-gold font-medium text-ink"
+                          : "border-line bg-panel text-cream hover:border-gold/60")
                       }
                     >
                       {c.label}
@@ -151,7 +185,7 @@ export default async function BookingPage({
                     <span
                       key={c.dateStr}
                       title="Zatvorené"
-                      className="cursor-not-allowed rounded-md border border-dashed border-gray-200 px-3 py-2 text-center text-sm text-gray-300"
+                      className="cursor-not-allowed rounded-sm border border-dashed border-line px-3 py-2 text-center text-sm text-muted/40"
                     >
                       {c.label}
                     </span>
@@ -161,19 +195,19 @@ export default async function BookingPage({
             </section>
 
             {/* KROK 3 – voľné sloty */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-medium text-gray-500">
-                3 · Voľný termín
+            <section className="space-y-4">
+              <h2 className="font-mono text-xs uppercase tracking-widest text-gold">
+                03 · Voľný termín
               </h2>
               {!selectedDate ? (
-                <p className="text-sm text-gray-500">Najprv vyber deň vyššie.</p>
+                <p className="text-sm text-muted">Najprv vyber deň vyššie.</p>
               ) : slots.length === 0 ? (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted">
                   V tento deň nie sú žiadne voľné termíny.
                 </p>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted">
                     {formatDateOnly(selectedDate)}
                   </p>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
@@ -182,16 +216,16 @@ export default async function BookingPage({
                       return (
                         <Link
                           key={t}
-                          href={`/?service=${service.id}&date=${sp.date}&slot=${encodeURIComponent(
+                          href={`/rezervacia?service=${service.id}&date=${sp.date}&slot=${encodeURIComponent(
                             t,
                           )}`}
                           scroll={false}
                           aria-pressed={isSel}
                           className={
-                            "rounded-md border px-3 py-2 text-center text-sm font-medium transition-colors " +
+                            "rounded-sm border px-3 py-2 text-center font-mono text-sm transition-colors " +
                             (isSel
-                              ? "border-gray-900 bg-gray-900 text-white"
-                              : "border-gray-300 bg-white text-gray-800 hover:border-gray-500")
+                              ? "border-gold bg-gold font-medium text-ink"
+                              : "border-line bg-panel text-cream hover:border-gold/60")
                           }
                         >
                           {t}
@@ -205,9 +239,9 @@ export default async function BookingPage({
 
             {/* KROK 4 – údaje zákazníka + odoslanie (po výbere slotu) */}
             {selectedDate && selectedSlot && (
-              <section className="space-y-3">
-                <h2 className="text-sm font-medium text-gray-500">
-                  4 · Tvoje údaje
+              <section className="space-y-4">
+                <h2 className="font-mono text-xs uppercase tracking-widest text-gold">
+                  04 · Tvoje údaje
                 </h2>
                 <BookingForm
                   serviceId={service.id}
@@ -216,7 +250,7 @@ export default async function BookingPage({
                   serviceName={service.name}
                   dateLabel={formatDateOnly(selectedDate)}
                   durationMin={service.durationMin}
-                  priceLabel={formatEur(service.priceCents)}
+                  priceLabel={formatServicePrice(service.priceCents, service.priceMaxCents)}
                 />
               </section>
             )}

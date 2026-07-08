@@ -19,12 +19,15 @@ enum BookingStatus {
 }
 
 model Service {
-  id          String   @id @default(cuid())
-  name        String
-  durationMin Int
-  priceCents  Int
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  id            String   @id @default(cuid())
+  name          String
+  description   String? // nepovinný popis služby
+  durationMin   Int // POVINNÉ, jedno číslo – čas, ktorý služba blokuje v kalendári
+  priceCents    Int // spodná / fixná cena
+  priceMaxCents Int? // horná hranica → ak vyplnené, cena je rozsah "od–do"
+  active        Boolean  @default(true)
+  bookable      Boolean  @default(true) // dá sa rezervovať online (admin nastaví)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   bookings Booking[]
 }

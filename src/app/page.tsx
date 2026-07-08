@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatEur, minutesToHHMM, WEEKDAYS } from "@/lib/format";
+import { minutesToHHMM, WEEKDAYS, formatServicePrice } from "@/lib/format";
 import { isoWeekdayUTC, todayLocalStartUTC } from "@/lib/date";
 import { Gallery } from "./gallery";
 
@@ -177,37 +177,7 @@ export default async function HomePage() {
         ) : (
           <div className="mt-12 space-y-4">
             {services.map((s, i) => (
-              <Link
-                key={s.id}
-                href={`/rezervacia?service=${s.id}`}
-                className="group relative flex items-center gap-5 overflow-hidden border border-line bg-panel p-6 transition-colors duration-300 hover:border-gold/60 sm:gap-8 sm:p-8"
-              >
-                <span className="absolute inset-y-0 left-0 w-1 origin-top scale-y-0 bg-gradient-to-b from-gold to-gold-deep transition-transform duration-300 group-hover:scale-y-100" />
-                <span className="font-mono text-sm text-gold">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <h3 className="font-display text-3xl uppercase leading-none text-cream sm:text-4xl">
-                      {s.name}
-                    </h3>
-                    <span className="font-display text-3xl leading-none text-gold sm:text-4xl">
-                      {formatEur(s.priceCents)}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-widest text-muted">
-                      {s.durationMin} min
-                    </span>
-                    <span className="font-mono text-xs uppercase tracking-widest text-muted transition-colors group-hover:text-gold">
-                      Rezervovať{" "}
-                      <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
-                        →
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </Link>
+              <ServiceCard key={s.id} s={s} num={String(i + 1).padStart(2, "0")} />
             ))}
           </div>
         )}
@@ -378,6 +348,86 @@ export default async function HomePage() {
 }
 
 // ---- Pomocné komponenty ---------------------------------------------------
+
+function ServiceCard({
+  s,
+  num,
+}: {
+  s: {
+    id: string;
+    name: string;
+    description: string | null;
+    durationMin: number;
+    priceCents: number;
+    priceMaxCents: number | null;
+    bookable: boolean;
+  };
+  num: string;
+}) {
+  const priceLabel = formatServicePrice(s.priceCents, s.priceMaxCents);
+  const base =
+    "group relative flex items-start gap-5 overflow-hidden border border-line bg-panel p-6 transition-colors duration-300 sm:gap-8 sm:p-8";
+
+  const body = (
+    <div className="flex-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 className="font-display text-2xl uppercase leading-none text-cream sm:text-3xl">
+          {s.name}
+        </h3>
+        <span className="whitespace-nowrap font-display text-2xl leading-none text-gold sm:text-3xl">
+          {priceLabel}
+        </span>
+      </div>
+      {s.description && (
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+          {s.description}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <span className="font-mono text-xs uppercase tracking-widest text-muted">
+          {s.durationMin} min{!s.bookable && " · Cena podľa dohody"}
+        </span>
+        {s.bookable ? (
+          <span className="font-mono text-xs uppercase tracking-widest text-muted transition-colors group-hover:text-gold">
+            Rezervovať{" "}
+            <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
+              →
+            </span>
+          </span>
+        ) : (
+          <a
+            href="https://instagram.com/s1m0n.daniel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-xs uppercase tracking-widest text-gold hover:underline"
+          >
+            Napíš nám →
+          </a>
+        )}
+      </div>
+    </div>
+  );
+
+  if (s.bookable) {
+    return (
+      <Link
+        href={`/rezervacia?service=${s.id}`}
+        className={`${base} hover:border-gold/60`}
+      >
+        <span className="absolute inset-y-0 left-0 w-1 origin-top scale-y-0 bg-gradient-to-b from-gold to-gold-deep transition-transform duration-300 group-hover:scale-y-100" />
+        <span className="mt-1 font-mono text-sm text-gold">{num}</span>
+        {body}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={base}>
+      <span className="mt-1 font-mono text-sm text-gold">{num}</span>
+      {body}
+    </div>
+  );
+}
 
 function ctaClass(size: "sm" | "lg"): string {
   const pad = size === "lg" ? "px-8 py-4 text-sm" : "px-5 py-2.5 text-xs";

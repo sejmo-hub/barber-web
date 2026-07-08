@@ -1,43 +1,108 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
 export type ServiceFormState = { error?: string; success?: string };
 
-// Pridanie novej služby. Cena prichádza z UI v eurách (napr. 12,50),
-// do DB sa ukladá ako priceCents = eurá × 100 (zaokrúhlené na celé centy).
+type ParsedService =
+  | {
+      ok: true;
+      data: {
+        name: string;
+        description: string | null;
+        durationMin: number;
+        priceCents: number;
+        priceMaxCents: number | null;
+        bookable: boolean;
+      };
+    }
+  | { ok: false; error: string };
+
+// Spoločné parsovanie + validácia formulára (pre pridanie aj úpravu).
+// Ceny prichádzajú v eurách, do DB idú ako centy (× 100, zaokrúhlené).
+function parseServiceForm(formData: FormData): ParsedService {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Názov nesmie byť prázdny." };
+
+  const descriptionRaw = String(formData.get("description") ?? "").trim();
+  const description = descriptionRaw === "" ? null : descriptionRaw;
+
+  const durationMin = Number.parseInt(
+    String(formData.get("durationMin") ?? "").trim(),
+    10,
+  );
+  if (!Number.isFinite(durationMin) || durationMin <= 0) {
+    return { ok: false, error: "Dĺžka musí byť celé číslo väčšie ako 0." };
+  }
+
+  const priceEur = Number.parseFloat(
+    String(formData.get("priceEur") ?? "").trim().replace(",", "."),
+  );
+  if (!Number.isFinite(priceEur) || priceEur < 0) {
+    return { ok: false, error: "Cena od musí byť číslo väčšie alebo rovné 0." };
+  }
+  const priceCents = Math.round(priceEur * 100);
+
+  // Cena do je nepovinná – ak je vyplnená, robí z ceny rozsah.
+  const priceMaxRaw = String(formData.get("priceMaxEur") ?? "")
+    .trim()
+    .replace(",", ".");
+  let priceMaxCents: number | null = null;
+  if (priceMaxRaw !== "") {
+    const priceMaxEur = Number.parseFloat(priceMaxRaw);
+    if (!Number.isFinite(priceMaxEur) || priceMaxEur < 0) {
+      return { ok: false, error: "Cena do musí byť platné číslo." };
+    }
+    priceMaxCents = Math.round(priceMaxEur * 100);
+    if (priceMaxCents < priceCents) {
+      return {
+        ok: false,
+        error: "Cena do musí byť väčšia alebo rovná cene od.",
+      };
+    }
+  }
+
+  const bookable = formData.get("bookable") != null;
+
+  return {
+    ok: true,
+    data: { name, description, durationMin, priceCents, priceMaxCents, bookable },
+  };
+}
+
+function revalidateServiceViews() {
+  revalidatePath("/admin/sluzby");
+  revalidatePath("/"); // sekcia služby na hlavnej
+  revalidatePath("/rezervacia"); // ponuka rezervovateľných služieb
+}
+
 export async function createService(
   _prev: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
-  const name = String(formData.get("name") ?? "").trim();
-  const durationRaw = String(formData.get("durationMin") ?? "").trim();
-  const priceRaw = String(formData.get("priceEur") ?? "")
-    .trim()
-    .replace(",", ".");
+  const p = parseServiceForm(formData);
+  if (!p.ok) return { error: p.error };
 
-  if (!name) {
-    return { error: "Názov nesmie byť prázdny." };
-  }
+  await prisma.service.create({ data: p.data });
+  revalidateServiceViews();
+  return { success: `Služba „${p.data.name}“ bola pridaná.` };
+}
 
-  const durationMin = Number.parseInt(durationRaw, 10);
-  if (!Number.isFinite(durationMin) || durationMin <= 0) {
-    return { error: "Dĺžka musí byť celé číslo väčšie ako 0." };
-  }
+export async function updateService(
+  _prev: ServiceFormState,
+  formData: FormData,
+): Promise<ServiceFormState> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Chýba ID služby." };
 
-  const priceEur = Number.parseFloat(priceRaw);
-  if (!Number.isFinite(priceEur) || priceEur < 0) {
-    return { error: "Cena musí byť číslo väčšie alebo rovné 0." };
-  }
-  const priceCents = Math.round(priceEur * 100);
+  const p = parseServiceForm(formData);
+  if (!p.ok) return { error: p.error };
 
-  await prisma.service.create({
-    data: { name, durationMin, priceCents },
-  });
-
-  revalidatePath("/admin/sluzby");
-  return { success: `Služba „${name}“ bola pridaná.` };
+  await prisma.service.update({ where: { id }, data: p.data });
+  revalidateServiceViews();
+  redirect("/admin/sluzby"); // ukončí režim úpravy
 }
 
 // Prepnutie active (aktivovať / deaktivovať).
@@ -52,16 +117,23 @@ export async function toggleService(formData: FormData): Promise<void> {
     where: { id },
     data: { active: !service.active },
   });
-  revalidatePath("/admin/sluzby");
+  revalidateServiceViews();
 }
 
-// Zmazanie služby. (Pozn.: FK Booking.serviceId má onDelete: Restrict –
-// službu s existujúcimi rezerváciami DB nedovolí zmazať. Booking flow ešte
-// neexistuje, takže teraz je mazanie vždy možné.)
+// Zmazanie služby. FK Booking.serviceId má onDelete: Restrict – službu
+// s existujúcimi rezerváciami DB nedovolí zmazať (radšej ju deaktivuj).
+// Chybu zachytíme, nech to nespadne ako 500.
 export async function deleteService(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  await prisma.service.delete({ where: { id } });
-  revalidatePath("/admin/sluzby");
+  try {
+    await prisma.service.delete({ where: { id } });
+  } catch (err) {
+    console.error(
+      "[deleteService] službu sa nepodarilo zmazať (pravdepodobne má rezervácie):",
+      err,
+    );
+  }
+  revalidateServiceViews();
 }

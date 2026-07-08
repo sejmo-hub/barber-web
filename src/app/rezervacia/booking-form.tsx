@@ -6,7 +6,7 @@ import { createBooking, type BookingResult } from "./actions";
 const initialState: BookingResult = { status: "idle" };
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none";
+  "w-full rounded-sm border border-line bg-ink2 px-3 py-2.5 text-sm text-cream placeholder:text-muted focus:border-gold focus:outline-none";
 
 export function BookingForm({
   serviceId,
@@ -33,32 +33,35 @@ export function BookingForm({
   // Potvrdzujúca obrazovka – formulár skrytý.
   if (state.status === "success") {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-5">
-        <h3 className="text-lg font-semibold text-green-800">
+      <div className="rounded-sm border border-gold/40 bg-gold/5 p-6">
+        <h3 className="font-display text-2xl uppercase text-gold">
           Rezervácia potvrdená
         </h3>
-        <p className="mt-2 text-sm text-green-900">
+        <p className="mt-3 text-cream">
           {state.summary.serviceName}
           <br />
           {state.summary.dateLabel} o {state.summary.time}
         </p>
-        <p className="mt-3 text-xs text-green-700">
-          Tešíme sa na teba. Podrobnosti nájdeš v tomto potvrdení.
+        <p className="mt-4 text-xs text-muted">
+          Tešíme sa na teba. Ak si zadal e-mail, potvrdenie ti príde do schránky.
         </p>
       </div>
     );
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       {/* Zhrnutie nad formulárom */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
-        <p className="text-xs uppercase tracking-wide text-gray-400">
+      <div className="rounded-sm border border-line bg-panel p-4">
+        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted">
           Zhrnutie
         </p>
-        <p className="mt-1 font-medium text-gray-900">{serviceName}</p>
-        <p className="text-gray-600">
-          {dateLabel} o {slot} · {durationMin} min · {priceLabel}
+        <p className="mt-1 font-display text-xl uppercase text-cream">
+          {serviceName}
+        </p>
+        <p className="mt-1 font-mono text-sm text-muted">
+          {dateLabel} · {slot} · {durationMin} min ·{" "}
+          <span className="text-gold">{priceLabel}</span>
         </p>
       </div>
 
@@ -69,7 +72,7 @@ export function BookingForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-gray-700">Meno</span>
+          <span className="mb-1.5 block font-medium text-cream">Meno</span>
           <input
             type="text"
             name="name"
@@ -80,7 +83,7 @@ export function BookingForm({
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-gray-700">Telefón</span>
+          <span className="mb-1.5 block font-medium text-cream">Telefón</span>
           <input
             type="tel"
             name="phone"
@@ -93,8 +96,8 @@ export function BookingForm({
       </div>
 
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-gray-700">
-          E-mail <span className="font-normal text-gray-400">(nepovinné)</span>
+        <span className="mb-1.5 block font-medium text-cream">
+          E-mail <span className="font-normal text-muted">(nepovinné)</span>
         </span>
         <input
           type="email"
@@ -103,13 +106,13 @@ export function BookingForm({
           placeholder="tvoj@email.sk"
           className={inputClass}
         />
-        <span className="mt-1 block text-xs text-gray-400">
+        <span className="mt-1.5 block text-xs text-muted">
           Ak vyplníš, pošleme ti potvrdenie rezervácie.
         </span>
       </label>
 
       {state.status === "error" && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
           {state.message}
         </p>
       )}
@@ -117,7 +120,7 @@ export function BookingForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+        className="bg-gradient-to-b from-gold to-gold-deep px-8 py-4 font-mono text-sm font-bold uppercase tracking-wider text-ink transition-all duration-300 hover:brightness-110 disabled:opacity-50"
       >
         {pending ? "Rezervujem…" : "Rezervovať termín"}
       </button>

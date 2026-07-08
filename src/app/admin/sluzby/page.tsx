@@ -1,15 +1,22 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatEur } from "@/lib/format";
+import { formatServicePrice } from "@/lib/format";
 import { ServiceForm } from "./service-form";
 import { deleteService, toggleService } from "./actions";
 
 // Vždy čerstvé dáta (admin nástroj – žiadne cachovanie zoznamu).
 export const dynamic = "force-dynamic";
 
-export default async function ServicesPage() {
+export default async function ServicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
+  const sp = await searchParams;
   const services = await prisma.service.findMany({
     orderBy: { createdAt: "desc" },
   });
+  const editing = sp.edit ? services.find((s) => s.id === sp.edit) : undefined;
 
   return (
     <div className="space-y-10">
@@ -28,21 +35,36 @@ export default async function ServicesPage() {
                   <th className="px-4 py-3 font-medium">Názov</th>
                   <th className="px-4 py-3 font-medium">Dĺžka</th>
                   <th className="px-4 py-3 font-medium">Cena</th>
+                  <th className="px-4 py-3 font-medium">Rezervácia</th>
                   <th className="px-4 py-3 font-medium">Stav</th>
                   <th className="px-4 py-3 text-right font-medium">Akcie</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {services.map((s) => (
-                  <tr key={s.id}>
-                    <td className="px-4 py-3 font-medium text-cream">
-                      {s.name}
+                  <tr key={s.id} className={s.id === editing?.id ? "bg-gold/5" : ""}>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-cream">{s.name}</div>
+                      {s.description && (
+                        <div className="mt-0.5 max-w-xs truncate text-xs text-muted">
+                          {s.description}
+                        </div>
+                      )}
                     </td>
+                    <td className="px-4 py-3 text-cream">{s.durationMin} min</td>
                     <td className="px-4 py-3 text-cream">
-                      {s.durationMin} min
+                      {formatServicePrice(s.priceCents, s.priceMaxCents)}
                     </td>
-                    <td className="px-4 py-3 text-cream">
-                      {formatEur(s.priceCents)}
+                    <td className="px-4 py-3">
+                      {s.bookable ? (
+                        <span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs font-medium text-gold">
+                          Online
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs font-medium text-muted">
+                          Osobne
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {s.active ? (
@@ -57,6 +79,12 @@ export default async function ServicesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
+                        <Link
+                          href={`/admin/sluzby?edit=${s.id}#form`}
+                          className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-gold hover:bg-white/5"
+                        >
+                          Upraviť
+                        </Link>
                         <form action={toggleService}>
                           <input type="hidden" name="id" value={s.id} />
                           <button
@@ -85,10 +113,12 @@ export default async function ServicesPage() {
         )}
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Pridať novú službu</h2>
+      <section id="form" className="scroll-mt-24 space-y-4">
+        <h2 className="text-lg font-semibold">
+          {editing ? `Upraviť službu: ${editing.name}` : "Pridať novú službu"}
+        </h2>
         <div className="rounded-lg border border-line bg-panel p-5">
-          <ServiceForm />
+          <ServiceForm editing={editing} />
         </div>
       </section>
     </div>

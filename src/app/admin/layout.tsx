@@ -1,15 +1,24 @@
 import { AdminNav } from "./admin-nav";
+import { getSession } from "@/lib/auth";
+import { logout } from "./logout-action";
 
-// ⚠️ TODO(pred produkciou): /admin je momentálne VEREJNÉ a BEZ autentifikácie,
-// aby sa dalo pohodlne testovať. Pred nasadením do produkcie NUTNE chrániť
-// loginom (napr. middleware kontrolujúci session/JWT), inak môže ktokoľvek
-// upravovať služby, hodiny aj rušiť rezervácie. Login pridáme v ďalšom kroku.
+// Login je aktívny (Časť 2): /admin/* chráni middleware (redirect na
+// /admin/login ak nie je platná session). Verejná časť zostáva verejná –
+// zákazníci sa neprihlasujú.
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getSession();
+
+  // Neprihlásený → minimálny shell. Reálne sem padne len /admin/login,
+  // ostatné /admin/* presmeruje middleware ešte pred renderom.
+  if (!session) {
+    return <div className="min-h-screen bg-ink text-cream">{children}</div>;
+  }
+
   return (
     <div className="min-h-screen bg-ink text-cream">
       <header className="border-b border-line bg-ink2">
@@ -21,6 +30,14 @@ export default function AdminLayout({
             </span>
           </span>
           <AdminNav />
+          <form action={logout} className="ml-auto">
+            <button
+              type="submit"
+              className="font-mono text-xs uppercase tracking-widest text-muted transition-colors hover:text-gold"
+            >
+              Odhlásiť sa
+            </button>
+          </form>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>

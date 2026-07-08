@@ -25,9 +25,32 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Simon The Barber",
+  // TODO: nastav reálnu doménu (kvôli absolútnym OG/canonical URL).
+  metadataBase: new URL("https://simons-the-barber.sk"),
+  title: {
+    default: "Simon's The Barber — Kuklov | Pánsky barbershop",
+    template: "%s | Simon's The Barber",
+  },
   description:
-    "Prémiový pánsky barbershop — Simon The Barber. Rezervuj si termín online.",
+    "Prémiový pánsky barbershop v Kuklove. Precízne strihy, fade a úprava brady. Rezervuj si termín online.",
+  keywords: ["barbershop", "Kuklov", "pánsky strih", "fade", "brada", "Simon"],
+  openGraph: {
+    title: "Simon's The Barber — Kuklov",
+    description:
+      "Pánsky barbershop v Kuklove. Strihy, fade, úprava brady. Rezervuj si termín online.",
+    type: "website",
+    locale: "sk_SK",
+    siteName: "Simon's The Barber",
+    // TODO: ideálne vlastný 1200×630 OG obrázok; zatiaľ fotka z galérie.
+    images: [
+      {
+        url: "/galeria/strih-1.jpg",
+        width: 1179,
+        height: 1371,
+        alt: "Simon's The Barber — Kuklov",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
