@@ -26,13 +26,13 @@ export default async function TimeOffPage() {
         <h1 className="text-2xl font-semibold">Dni voľna</h1>
 
         {items.length === 0 ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted">
             Zatiaľ žiadne budúce dni voľna. Pridaj prvý nižšie.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-line bg-panel">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 text-gray-500">
+              <thead className="border-b border-line text-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">Dátum</th>
                   <th className="px-4 py-3 font-medium">Typ</th>
@@ -40,13 +40,13 @@ export default async function TimeOffPage() {
                   <th className="px-4 py-3 text-right font-medium">Akcie</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-white/5">
                 {items.map((t) => (
                   <tr key={t.id}>
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-cream">
                       {formatDateOnly(t.date)}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-cream">
                       {t.allDay ? (
                         "Celý deň"
                       ) : (
@@ -59,7 +59,7 @@ export default async function TimeOffPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-cream">
                       {t.reason ?? "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -68,7 +68,7 @@ export default async function TimeOffPage() {
                           <input type="hidden" name="id" value={t.id} />
                           <button
                             type="submit"
-                            className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                            className="rounded-md border border-red-500/30 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
                           >
                             Zmazať
                           </button>
@@ -85,7 +85,7 @@ export default async function TimeOffPage() {
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Pridať deň voľna</h2>
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="rounded-lg border border-line bg-panel p-5">
           <TimeOffForm minDate={formatDateInputUTC(today)} />
         </div>
       </section>

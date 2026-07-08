@@ -114,3 +114,29 @@ export function localMinutesToUtc(dayAnchorUtc: Date, minutes: number): Date {
   if (off2 !== off1) utc = guess - off2;
   return new Date(utc);
 }
+
+/**
+ * Absolútny UTC okamih → lokálne komponenty v TIME_ZONE: kalendárny deň
+ * ("YYYY-MM-DD") a minúty od lokálnej polnoci. Používa kalendár na umiestnenie
+ * (UTC) rezervácie na správny deň a čas v lokálnom „nástennom" čase.
+ */
+export function utcToLocalParts(instant: Date): {
+  dateStr: string;
+  minutes: number;
+} {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIME_ZONE,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const p: Record<string, string> = {};
+  for (const part of dtf.formatToParts(instant)) p[part.type] = part.value;
+  return {
+    dateStr: `${p.year}-${p.month}-${p.day}`,
+    minutes: Number(p.hour) * 60 + Number(p.minute),
+  };
+}

@@ -13,38 +13,38 @@ export function AddBlockForm({ weekday }: { weekday: number }) {
       <input type="hidden" name="weekday" value={weekday} />
 
       <label className="text-sm">
-        <span className="mb-1 block text-gray-500">Od</span>
+        <span className="mb-1 block text-muted">Od</span>
         <input
           type="time"
           name="start"
           required
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+          className="rounded-md border border-line bg-ink2 px-2 py-1.5 text-sm text-cream placeholder:text-muted focus:border-gold focus:outline-none"
         />
       </label>
 
       <label className="text-sm">
-        <span className="mb-1 block text-gray-500">Do</span>
+        <span className="mb-1 block text-muted">Do</span>
         <input
           type="time"
           name="end"
           required
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+          className="rounded-md border border-line bg-ink2 px-2 py-1.5 text-sm text-cream placeholder:text-muted focus:border-gold focus:outline-none"
         />
       </label>
 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+        className="rounded-md bg-gold px-3 py-1.5 text-sm font-medium text-ink hover:bg-[#d8ba74] disabled:opacity-50"
       >
         {pending ? "…" : "Pridať blok"}
       </button>
 
       {state.error && (
-        <p className="w-full text-sm text-red-600">{state.error}</p>
+        <p className="w-full text-sm text-red-400">{state.error}</p>
       )}
       {state.success && (
-        <p className="w-full text-sm text-green-600">{state.success}</p>
+        <p className="w-full text-sm text-emerald-300">{state.success}</p>
       )}
     </form>
   );

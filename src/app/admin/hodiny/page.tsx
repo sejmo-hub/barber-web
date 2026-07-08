@@ -20,7 +20,7 @@ export default async function HoursPage() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">Pracovné hodiny</h1>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           Pridaj jeden alebo viac časových blokov na deň. Viac blokov = prestávka
           (napr. 09:00–12:00 a 13:00–17:00).
         </p>
@@ -32,20 +32,20 @@ export default async function HoursPage() {
           return (
             <section
               key={day.iso}
-              className="rounded-lg border border-gray-200 bg-white p-4"
+              className="rounded-lg border border-line bg-panel p-4"
             >
               <h2 className="font-semibold">{day.label}</h2>
 
               {dayBlocks.length === 0 ? (
-                <p className="mt-2 text-sm text-gray-500">Žiadne bloky – voľno.</p>
+                <p className="mt-2 text-sm text-muted">Žiadne bloky – voľno.</p>
               ) : (
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {dayBlocks.map((b) => (
                     <li
                       key={b.id}
-                      className="flex items-center gap-2 rounded-md bg-gray-100 px-2.5 py-1 text-sm"
+                      className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-1 text-sm"
                     >
-                      <span className="font-medium text-gray-800">
+                      <span className="font-medium text-cream">
                         {minutesToHHMM(b.startMinute)}–{minutesToHHMM(b.endMinute)}
                       </span>
                       <form action={deleteBlock}>
@@ -53,7 +53,7 @@ export default async function HoursPage() {
                         <button
                           type="submit"
                           aria-label="Zmazať blok"
-                          className="text-gray-400 hover:text-red-600"
+                          className="text-muted hover:text-red-400"
                         >
                           ✕
                         </button>

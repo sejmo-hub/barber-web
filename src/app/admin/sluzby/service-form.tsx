@@ -15,18 +15,18 @@ export function ServiceForm() {
     <form action={formAction} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-gray-700">Názov</span>
+          <span className="mb-1 block font-medium text-cream">Názov</span>
           <input
             type="text"
             name="name"
             required
             placeholder="napr. Pánsky strih"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-md border border-line bg-ink2 px-3 py-2 text-sm text-cream placeholder:text-muted focus:border-gold focus:outline-none"
           />
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-gray-700">
+          <span className="mb-1 block font-medium text-cream">
             Dĺžka (min)
           </span>
           <input
@@ -36,12 +36,12 @@ export function ServiceForm() {
             step={1}
             required
             placeholder="napr. 30"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-md border border-line bg-ink2 px-3 py-2 text-sm text-cream placeholder:text-muted focus:border-gold focus:outline-none"
           />
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-gray-700">
+          <span className="mb-1 block font-medium text-cream">
             Cena (€)
           </span>
           <input
@@ -51,18 +51,18 @@ export function ServiceForm() {
             step="0.01"
             required
             placeholder="napr. 12,00"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-md border border-line bg-ink2 px-3 py-2 text-sm text-cream placeholder:text-muted focus:border-gold focus:outline-none"
           />
         </label>
       </div>
 
       {state.error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
           {state.success}
         </p>
       )}
@@ -70,7 +70,7 @@ export function ServiceForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+        className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-[#d8ba74] disabled:opacity-50"
       >
         {pending ? "Ukladám…" : "Pridať službu"}
       </button>

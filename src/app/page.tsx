@@ -1,228 +1,437 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatEur, WEEKDAYS, hhmmToMinutes } from "@/lib/format";
-import {
-  formatDateOnly,
-  formatDateInputUTC,
-  todayLocalStartUTC,
-  localDateStringToUTC,
-  isoWeekdayUTC,
-} from "@/lib/date";
-import { computeFreeSlots } from "@/lib/slots";
-import { BookingForm } from "./booking-form";
+import { formatEur, minutesToHHMM, WEEKDAYS } from "@/lib/format";
+import { isoWeekdayUTC, todayLocalStartUTC } from "@/lib/date";
+import { Gallery } from "./gallery";
 
-// Dočasná verejná stránka = booking flow (KROK 1: výber služby, KROK 2: deň,
-// KROK 3: zobrazenie voľných slotov). Pekný hlavný dizajn príde samostatne.
-// Kroky sú riešené cez query params (?service=&date=), takže sú to obyčajné
-// odkazy – jednoduché a funkčné aj bez JS.
 export const dynamic = "force-dynamic";
 
-const DAYS_AHEAD = 14;
+// Silnejší grain pre atmosféru.
+const GRAIN =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
 
-export default async function BookingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ service?: string; date?: string; slot?: string }>;
-}) {
-  const sp = await searchParams;
+const TICKER = [
+  "Strih",
+  "Fade",
+  "Brada",
+  "Hot towel",
+  "Styling",
+  "Walk-ins welcome",
+];
 
-  const services = await prisma.service.findMany({
-    where: { active: true },
-    orderBy: { name: "asc" },
-  });
-  const service = sp.service
-    ? services.find((s) => s.id === sp.service)
-    : undefined;
+export default async function HomePage() {
+  const [services, workingHours] = await Promise.all([
+    prisma.service.findMany({
+      where: { active: true },
+      orderBy: { priceCents: "asc" },
+    }),
+    prisma.workingHours.findMany({
+      orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
+    }),
+  ]);
 
-  // Predpočítaj dni a sloty (len keď je vybraná služba).
-  const dayCells: {
-    dateStr: string;
-    label: string;
-    available: boolean;
-    selected: boolean;
-  }[] = [];
-  let selectedDate: Date | null = null;
-  let slots: string[] = [];
-  let selectedSlot: string | null = null;
-
-  if (service) {
-    const whWeekdays = new Set(
-      (await prisma.workingHours.findMany({ select: { weekday: true } })).map(
-        (w) => w.weekday,
-      ),
-    );
-    const today = todayLocalStartUTC();
-    for (let i = 0; i < DAYS_AHEAD; i++) {
-      // UTC aritmetika: +1 deň = presne ďalšia UTC polnoc (kotva kal. dňa).
-      const d = new Date(today.getTime() + i * 86_400_000);
-      const dateStr = formatDateInputUTC(d);
-      const wd = isoWeekdayUTC(d);
-      dayCells.push({
-        dateStr,
-        label: `${WEEKDAYS[wd - 1].label.slice(0, 2)} ${formatDateOnly(d)}`,
-        available: whWeekdays.has(wd),
-        selected: sp.date === dateStr,
-      });
-    }
-    selectedDate = sp.date ? localDateStringToUTC(sp.date) : null;
-    if (selectedDate) {
-      slots = await computeFreeSlots(service.durationMin, selectedDate);
-      // Slot považujeme za vybraný, ak je to platný HH:MM (autoritatívnu
-      // kontrolu voľnosti robí až server action pri odoslaní).
-      selectedSlot =
-        sp.slot && hhmmToMinutes(sp.slot) !== null ? sp.slot : null;
-    }
+  const whByDay = new Map<number, { startMinute: number; endMinute: number }[]>();
+  for (const w of workingHours) {
+    const arr = whByDay.get(w.weekday) ?? [];
+    arr.push({ startMinute: w.startMinute, endMinute: w.endMinute });
+    whByDay.set(w.weekday, arr);
   }
+  const todayIso = isoWeekdayUTC(todayLocalStartUTC());
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-2xl space-y-8 px-4 py-10">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-semibold">Rezervácia</h1>
-          <p className="text-sm text-gray-500">
-            Vyber si službu, deň a voľný termín.
+    <div className="relative min-h-screen bg-ink text-cream">
+      {/* grain cez celú plochu */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[60] opacity-[0.06] mix-blend-soft-light"
+        style={{ backgroundImage: `url("${GRAIN}")` }}
+      />
+
+      {/* Sticky hlavička */}
+      <header className="sticky top-0 z-40 border-b border-line/70 bg-ink/70 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-6">
+          <Wordmark size="sm" />
+          <nav className="hidden items-center gap-8 font-mono text-xs uppercase tracking-widest text-muted md:flex">
+            <a href="#sluzby" className="transition-colors hover:text-cream">Služby</a>
+            <a href="#galeria" className="transition-colors hover:text-cream">Galéria</a>
+            <a href="#kontakt" className="transition-colors hover:text-cream">Kontakt</a>
+          </nav>
+          <Link href="/rezervacia" className={ctaClass("sm")}>
+            Rezervovať
+          </Link>
+        </div>
+      </header>
+
+      {/* ============ HERO ============ */}
+      <section className="relative flex min-h-[92vh] flex-col overflow-hidden">
+        {/* pozadie = miesto pre veľkú hero fotku */}
+        <div aria-hidden className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-ink2 via-ink to-black" />
+          {/* diagonálne linky (barber pole nádych) */}
+          <div
+            className="absolute inset-0 opacity-[0.5]"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(135deg, transparent 0, transparent 22px, rgba(201,169,97,0.04) 22px, rgba(201,169,97,0.04) 23px)",
+            }}
+          />
+          {/* zlatý glow */}
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(60% 55% at 78% 22%, rgba(201,169,97,0.18), transparent 60%)",
+            }}
+          />
+          {/* overlay pre čitateľnosť textu */}
+          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-ink/20" />
+          <span className="absolute bottom-5 right-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted/40">
+            [ Hero fotka — placeholder ]
+          </span>
+        </div>
+
+        {/* obsah */}
+        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 py-16 sm:px-6">
+          {/* badge riadok */}
+          <div className="mb-8 flex flex-wrap items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
+            <span className="border border-gold/40 px-3 py-1.5 text-gold">Est. 2026</span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Walk-ins welcome
+            </span>
+            <span className="hidden sm:inline">/ Pánsky barbershop</span>
+          </div>
+
+          {/* vysadený názov – layered */}
+          <div className="relative">
+            <span
+              aria-hidden
+              className="text-stroke-gold pointer-events-none absolute -left-0.5 -top-1 select-none font-display uppercase leading-[0.78] opacity-40"
+              style={{ fontSize: "clamp(3.75rem, 17vw, 12rem)" }}
+            >
+              Simon
+            </span>
+            <h1
+              className="relative font-display uppercase leading-[0.78] text-cream"
+              style={{
+                fontSize: "clamp(3.75rem, 17vw, 12rem)",
+                textShadow: "0 0 70px rgba(201,169,97,0.18)",
+              }}
+            >
+              Simon
+            </h1>
+          </div>
+          <div className="mt-4 flex items-center gap-4">
+            <span className="h-px w-12 bg-gold" />
+            <span className="font-mono text-sm uppercase tracking-[0.4em] text-muted sm:text-base">
+              <span className="text-gold">The</span> Barber
+            </span>
+            <span className="h-px flex-1 bg-gradient-to-r from-gold/50 to-transparent" />
+          </div>
+
+          <p className="mt-8 max-w-lg text-lg leading-relaxed text-cream/90">
+            Precízny fade, ostrá linka, poctivé remeslo. Barbershop pre chlapov,
+            ktorí vedia, ako chcú vyzerať.
           </p>
-        </header>
 
-        {/* KROK 1 – výber služby */}
-        {!service ? (
-          <section className="space-y-3">
-            <h2 className="text-sm font-medium text-gray-500">1 · Služba</h2>
-            {services.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                Momentálne nie sú dostupné žiadne služby.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {services.map((s) => (
-                  <li key={s.id}>
-                    <Link
-                      href={`/?service=${s.id}`}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 hover:border-gray-400"
-                    >
-                      <span className="font-medium">{s.name}</span>
-                      <span className="text-sm text-gray-500">
-                        {s.durationMin} min · {formatEur(s.priceCents)}
-                      </span>
-                    </Link>
-                  </li>
+          <div className="mt-10 flex flex-wrap items-center gap-4">
+            <Link href="/rezervacia" className={ctaClass("lg")}>
+              Rezervovať termín{" "}
+              <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
+                →
+              </span>
+            </Link>
+            <a
+              href="#sluzby"
+              className="border border-line px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-cream transition-colors duration-300 hover:border-gold/60 hover:text-gold"
+            >
+              Cenník
+            </a>
+          </div>
+        </div>
+
+        {/* ticker */}
+        <div className="relative z-10 overflow-hidden border-y border-line bg-ink2/70 py-4 backdrop-blur-sm">
+          <div className="flex w-max animate-marquee">
+            {[0, 1].map((copy) => (
+              <div key={copy} className="flex shrink-0" aria-hidden={copy === 1}>
+                {TICKER.map((w) => (
+                  <span
+                    key={w}
+                    className="flex items-center font-mono text-sm uppercase tracking-[0.2em] text-muted"
+                  >
+                    <span className="mx-6 text-gold">/</span>
+                    {w}
+                  </span>
                 ))}
-              </ul>
-            )}
-          </section>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ 01 SLUŽBY ============ */}
+      <section id="sluzby" className="mx-auto max-w-6xl px-5 py-24 sm:px-6 sm:py-32">
+        <SectionHead num="01" overline="Cenník" title="Služby" />
+        {services.length === 0 ? (
+          <p className="mt-10 text-muted">Služby budú čoskoro doplnené.</p>
         ) : (
-          <>
-            {/* Zhrnutie vybranej služby */}
-            <section className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400">
-                  Služba
-                </p>
-                <p className="font-medium">
-                  {service.name} · {service.durationMin} min ·{" "}
-                  {formatEur(service.priceCents)}
-                </p>
-              </div>
-              <Link href="/" className="text-sm text-gray-500 hover:underline">
-                Zmeniť
-              </Link>
-            </section>
-
-            {/* KROK 2 – výber dňa */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-medium text-gray-500">2 · Deň</h2>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {dayCells.map((c) =>
-                  c.available ? (
-                    <Link
-                      key={c.dateStr}
-                      href={`/?service=${service.id}&date=${c.dateStr}`}
-                      aria-current={c.selected ? "true" : undefined}
-                      className={
-                        "rounded-md border px-3 py-2 text-center text-sm transition-colors " +
-                        (c.selected
-                          ? "border-gray-900 bg-gray-900 text-white"
-                          : "border-gray-300 bg-white text-gray-800 hover:border-gray-500")
-                      }
-                    >
-                      {c.label}
-                    </Link>
-                  ) : (
-                    <span
-                      key={c.dateStr}
-                      title="Zatvorené"
-                      className="cursor-not-allowed rounded-md border border-dashed border-gray-200 px-3 py-2 text-center text-sm text-gray-300"
-                    >
-                      {c.label}
+          <div className="mt-12 space-y-4">
+            {services.map((s, i) => (
+              <Link
+                key={s.id}
+                href={`/rezervacia?service=${s.id}`}
+                className="group relative flex items-center gap-5 overflow-hidden border border-line bg-panel p-6 transition-colors duration-300 hover:border-gold/60 sm:gap-8 sm:p-8"
+              >
+                <span className="absolute inset-y-0 left-0 w-1 origin-top scale-y-0 bg-gradient-to-b from-gold to-gold-deep transition-transform duration-300 group-hover:scale-y-100" />
+                <span className="font-mono text-sm text-gold">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <h3 className="font-display text-3xl uppercase leading-none text-cream sm:text-4xl">
+                      {s.name}
+                    </h3>
+                    <span className="font-display text-3xl leading-none text-gold sm:text-4xl">
+                      {formatEur(s.priceCents)}
                     </span>
-                  ),
-                )}
-              </div>
-            </section>
-
-            {/* KROK 3 – voľné sloty */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-medium text-gray-500">
-                3 · Voľný termín
-              </h2>
-              {!selectedDate ? (
-                <p className="text-sm text-gray-500">Najprv vyber deň vyššie.</p>
-              ) : slots.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  V tento deň nie sú žiadne voľné termíny.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
-                    {formatDateOnly(selectedDate)}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                    {slots.map((t) => {
-                      const isSel = t === selectedSlot;
-                      return (
-                        <Link
-                          key={t}
-                          href={`/?service=${service.id}&date=${sp.date}&slot=${encodeURIComponent(
-                            t,
-                          )}`}
-                          scroll={false}
-                          aria-pressed={isSel}
-                          className={
-                            "rounded-md border px-3 py-2 text-center text-sm font-medium transition-colors " +
-                            (isSel
-                              ? "border-gray-900 bg-gray-900 text-white"
-                              : "border-gray-300 bg-white text-gray-800 hover:border-gray-500")
-                          }
-                        >
-                          {t}
-                        </Link>
-                      );
-                    })}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="font-mono text-xs uppercase tracking-widest text-muted">
+                      {s.durationMin} min
+                    </span>
+                    <span className="font-mono text-xs uppercase tracking-widest text-muted transition-colors group-hover:text-gold">
+                      Rezervovať{" "}
+                      <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
+                        →
+                      </span>
+                    </span>
                   </div>
                 </div>
-              )}
-            </section>
-
-            {/* KROK 4 – údaje zákazníka + odoslanie (po výbere slotu) */}
-            {selectedDate && selectedSlot && (
-              <section className="space-y-3">
-                <h2 className="text-sm font-medium text-gray-500">
-                  4 · Tvoje údaje
-                </h2>
-                <BookingForm
-                  serviceId={service.id}
-                  dateStr={sp.date ?? ""}
-                  slot={selectedSlot}
-                  serviceName={service.name}
-                  dateLabel={formatDateOnly(selectedDate)}
-                  durationMin={service.durationMin}
-                  priceLabel={formatEur(service.priceCents)}
-                />
-              </section>
-            )}
-          </>
+              </Link>
+            ))}
+          </div>
         )}
+      </section>
+
+      {/* ============ 02 GALÉRIA ============ */}
+      <section id="galeria" className="border-t border-line/60">
+        <div className="mx-auto max-w-6xl px-5 py-24 sm:px-6 sm:py-32">
+          <SectionHead num="02" overline="Portfólio" title="Naša práca" />
+          <Gallery />
+        </div>
+      </section>
+
+      {/* ============ 03 KONTAKT ============ */}
+      <section id="kontakt" className="border-t border-line/60">
+        <div className="mx-auto max-w-6xl px-5 py-24 sm:px-6 sm:py-32">
+          <SectionHead num="03" overline="Návšteva" title="Kde nás nájdeš" />
+          <div className="mt-12 grid gap-12 md:grid-cols-3">
+            {/* Adresa */}
+            <div>
+              <h3 className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-gold">
+                Adresa
+              </h3>
+              <p className="mt-4 text-lg leading-relaxed text-cream">
+                Kuklov 12
+                <br />
+                908 78 Kuklov
+              </p>
+              {/* Google Maps embed cez q parameter – bez API kľúča. Filter zladí
+                  mapu s tmavým brandom; ak chceš klasickú farebnú mapu, odstráň
+                  vlastnosť filter v style. */}
+              <div className="mt-5 overflow-hidden rounded-sm border border-line ring-1 ring-gold/20">
+                <iframe
+                  title="Mapa — Simon's The Barber, Kuklov 12"
+                  src="https://maps.google.com/maps?q=Kuklov%2012%2C%20908%2078%20Kuklov&output=embed"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="block h-[340px] w-full"
+                  style={{ border: 0, filter: "invert(0.9) hue-rotate(180deg)" }}
+                />
+              </div>
+            </div>
+
+            {/* Otváracie hodiny */}
+            <div>
+              <h3 className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-gold">
+                Otváracie hodiny
+              </h3>
+              <div className="mt-4">
+                {WEEKDAYS.map((d) => {
+                  const blocks = whByDay.get(d.iso) ?? [];
+                  const isToday = d.iso === todayIso;
+                  return (
+                    <div
+                      key={d.iso}
+                      className={
+                        "flex items-center justify-between border-t border-line py-2.5 text-sm " +
+                        (isToday ? "text-cream" : "text-muted")
+                      }
+                    >
+                      <span className={isToday ? "font-medium text-gold" : ""}>
+                        {d.label}
+                      </span>
+                      <span className="font-mono text-xs">
+                        {blocks.length
+                          ? blocks
+                              .map(
+                                (b) =>
+                                  `${minutesToHHMM(b.startMinute)}–${minutesToHHMM(b.endMinute)}`,
+                              )
+                              .join(", ")
+                          : "Zatvorené"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Kontakt */}
+            <div>
+              <h3 className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-gold">
+                Kontakt
+              </h3>
+              <a
+                href="tel:+421944469217"
+                className="mt-4 block font-display text-3xl text-cream transition-colors hover:text-gold"
+              >
+                0944 469 217
+              </a>
+              <p className="mt-2 text-sm text-muted">
+                Nájdeš nás aj na Instagrame a Facebooku.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-widest text-muted">
+                <a
+                  href="https://instagram.com/s1m0n.daniel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-line px-3 py-1.5 transition-colors hover:border-gold/50 hover:text-gold"
+                >
+                  Instagram
+                </a>
+                {/* TODO: doplniť presný Facebook URL (zatiaľ všeobecný facebook.com) */}
+                <a
+                  href="https://facebook.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-line px-3 py-1.5 transition-colors hover:border-gold/50 hover:text-gold"
+                >
+                  Facebook
+                </a>
+                <a
+                  href="https://wa.me/421944469217"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-line px-3 py-1.5 transition-colors hover:border-gold/50 hover:text-gold"
+                >
+                  WhatsApp
+                </a>
+              </div>
+              <Link href="/rezervacia" className={`${ctaClass("lg")} mt-8 inline-block`}>
+                Rezervovať termín
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ PÄTIČKA ============ */}
+      <footer className="relative overflow-hidden border-t border-gold/20">
+        <span
+          aria-hidden
+          className="text-stroke pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 select-none font-display uppercase leading-none opacity-[0.06]"
+          style={{ fontSize: "22vw" }}
+        >
+          Barber
+        </span>
+        <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 py-14 text-center sm:flex-row sm:justify-between sm:text-left">
+          <Wordmark size="sm" />
+          <div className="flex items-center gap-4 font-mono text-[11px] uppercase tracking-widest text-muted">
+            <span className="text-gold">Est. 2026</span>
+            <span className="text-line">|</span>
+            <a
+              href="https://instagram.com/s1m0n.daniel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-gold"
+            >
+              Instagram
+            </a>
+            {/* TODO: doplniť presný Facebook URL */}
+            <a
+              href="https://facebook.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-gold"
+            >
+              Facebook
+            </a>
+          </div>
+          <p className="font-mono text-[11px] text-muted">
+            © 2026 Simon The Barber
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// ---- Pomocné komponenty ---------------------------------------------------
+
+function ctaClass(size: "sm" | "lg"): string {
+  const pad = size === "lg" ? "px-8 py-4 text-sm" : "px-5 py-2.5 text-xs";
+  return (
+    "group inline-flex items-center gap-2 bg-gradient-to-b from-gold to-gold-deep font-mono font-bold uppercase tracking-wider text-ink " +
+    "transition-all duration-300 hover:shadow-[0_10px_40px_-8px_rgba(201,169,97,0.5)] hover:brightness-110 " +
+    pad
+  );
+}
+
+function Wordmark({ size = "md" }: { size?: "sm" | "md" }) {
+  const simon = size === "sm" ? "text-2xl" : "text-4xl";
+  const sub = size === "sm" ? "text-[8px]" : "text-[10px]";
+  return (
+    <div className="leading-none">
+      <div className={`${simon} font-display uppercase leading-none text-cream`}>
+        Simon
+      </div>
+      <div
+        className={`${sub} mt-1 font-mono uppercase tracking-[0.35em] text-muted`}
+      >
+        <span className="text-gold">The</span> Barber
       </div>
     </div>
   );
 }
+
+function SectionHead({
+  num,
+  overline,
+  title,
+}: {
+  num: string;
+  overline: string;
+  title: string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-6 border-b border-line pb-6">
+      <div>
+        <span className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
+          {overline}
+        </span>
+        <h2 className="mt-3 font-display text-5xl uppercase leading-[0.85] text-cream sm:text-6xl md:text-7xl">
+          {title}
+        </h2>
+      </div>
+      <span
+        aria-hidden
+        className="text-stroke select-none font-display leading-none"
+        style={{ fontSize: "clamp(3rem, 9vw, 7rem)" }}
+      >
+        {num}
+      </span>
+    </div>
+  );
+}
+
