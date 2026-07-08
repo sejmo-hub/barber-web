@@ -1,0 +1,76 @@
+// Barber booking – single-tenant (one barber).
+// Prisma schema. Docs: https://pris.ly/d/prisma-schema
+//
+// Note (Prisma 7): the datasource connection string is provided from
+// prisma.config.ts (process.env["DATABASE_URL"]), not from this file.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  durationMin Int
+  priceCents  Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  bookings Booking[]
+}
+
+/// Opening hours. weekday is ISO-8601 (1 = Monday … 7 = Sunday).
+/// Minutes are counted from midnight (e.g. 9:00 = 540, 17:30 = 1050).
+/// Multiple rows per weekday are allowed (e.g. a morning + afternoon
+/// block split by a lunch break).
+model WorkingHours {
+  id          String @id @default(cuid())
+  weekday     Int // ISO 1–7
+  startMinute Int // minutes from midnight
+  endMinute   Int // minutes from midnight
+
+  @@index([weekday])
+}
+
+/// Days (or parts of days) the barber is unavailable.
+/// allDay = true → whole `date` is off and start/endMinute are ignored.
+/// allDay = false → only [startMinute, endMinute) on `date` is off.
+model TimeOff {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Timestamptz(3)
+  allDay      Boolean  @default(true)
+  startMinute Int? // minutes from midnight (when allDay = false)
+  endMinute   Int? // minutes from midnight (when allDay = false)
+  reason      String?
+
+  @@index([date])
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  serviceId     String
+  service       Service       @relation(fields: [serviceId], references: [id])
+  customerName  String
+  customerEmail String? // nepovinný – ak zadaný, pošleme potvrdzovací e-mail
+  customerPhone String
+  startAt       DateTime      @db.Timestamptz(3) // stored in UTC
+  endAt         DateTime      @db.Timestamptz(3) // stored in UTC
+  status        BookingStatus @default(CONFIRMED)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  // Overlap prevention (EXCLUDE constraint on tstzrange for CONFIRMED
+  // bookings) is added via raw SQL in the init migration – Prisma cannot
+  // express exclusion constraints in the schema.
+
+  @@index([serviceId])
+  @@index([startAt])
+}
