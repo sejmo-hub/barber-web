@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { minutesToHHMM, WEEKDAYS, formatServicePrice } from "@/lib/format";
 import { isoWeekdayUTC, todayLocalStartUTC } from "@/lib/date";
@@ -85,67 +86,90 @@ export default async function HomePage() {
           />
           {/* overlay pre čitateľnosť textu */}
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-ink/20" />
-          <span className="absolute bottom-5 right-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted/40">
-            [ Hero fotka — placeholder ]
-          </span>
         </div>
 
         {/* obsah */}
-        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 py-16 sm:px-6">
-          {/* badge riadok */}
-          <div className="mb-8 flex flex-wrap items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
-            <span className="border border-gold/40 px-3 py-1.5 text-gold">Est. 2026</span>
-            <span className="inline-flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Walk-ins welcome
-            </span>
-            <span className="hidden sm:inline">/ Pánsky barbershop</span>
-          </div>
+        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center px-5 py-16 sm:px-6">
+          <div className="grid w-full items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8">
+            {/* ĽAVÁ – text */}
+            <div>
+              {/* badge riadok */}
+              <div className="mb-8 flex flex-wrap items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
+                <span className="border border-gold/40 px-3 py-1.5 text-gold">Est. 2026</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Walk-ins welcome
+                </span>
+                <span className="hidden sm:inline">/ Pánsky barbershop</span>
+              </div>
 
-          {/* vysadený názov – layered */}
-          <div className="relative">
-            <span
-              aria-hidden
-              className="text-stroke-gold pointer-events-none absolute -left-0.5 -top-1 select-none font-display uppercase leading-[0.78] opacity-40"
-              style={{ fontSize: "clamp(3.75rem, 17vw, 12rem)" }}
-            >
-              Simon
-            </span>
-            <h1
-              className="relative font-display uppercase leading-[0.78] text-cream"
-              style={{
-                fontSize: "clamp(3.75rem, 17vw, 12rem)",
-                textShadow: "0 0 70px rgba(201,169,97,0.18)",
-              }}
-            >
-              Simon
-            </h1>
-          </div>
-          <div className="mt-4 flex items-center gap-4">
-            <span className="h-px w-12 bg-gold" />
-            <span className="font-mono text-sm uppercase tracking-[0.4em] text-muted sm:text-base">
-              <span className="text-gold">The</span> Barber
-            </span>
-            <span className="h-px flex-1 bg-gradient-to-r from-gold/50 to-transparent" />
-          </div>
+              {/* vysadený názov – layered */}
+              <div className="relative">
+                <span
+                  aria-hidden
+                  className="text-stroke-gold pointer-events-none absolute -left-0.5 -top-1 select-none font-display uppercase leading-[0.78] opacity-40"
+                  style={{ fontSize: "clamp(3rem, 13vw, 9.5rem)" }}
+                >
+                  Simon&#39;s
+                </span>
+                <h1
+                  className="relative font-display uppercase leading-[0.78] text-cream"
+                  style={{
+                    fontSize: "clamp(3rem, 13vw, 9.5rem)",
+                    textShadow: "0 0 70px rgba(201,169,97,0.18)",
+                  }}
+                >
+                  Simon&#39;s
+                </h1>
+              </div>
+              <div className="mt-4 flex items-center gap-4">
+                <span className="h-px w-12 bg-gold" />
+                <span className="font-mono text-sm uppercase tracking-[0.4em] text-muted sm:text-base">
+                  <span className="text-gold">The</span> Barber
+                </span>
+                <span className="h-px flex-1 bg-gradient-to-r from-gold/50 to-transparent" />
+              </div>
 
-          <p className="mt-8 max-w-lg text-lg leading-relaxed text-cream/90">
-            Precízny fade, ostrá linka, poctivé remeslo. Barbershop pre chlapov,
-            ktorí vedia, ako chcú vyzerať.
-          </p>
+              <p className="mt-8 max-w-lg text-lg leading-relaxed text-cream/90">
+                Precízny fade, ostrá linka, poctivé remeslo. Barbershop pre
+                chlapov, ktorí vedia, ako chcú vyzerať.
+              </p>
 
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            <Link href="/rezervacia" className={ctaClass("lg")}>
-              Rezervovať termín{" "}
-              <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
-                →
-              </span>
-            </Link>
-            <a
-              href="#sluzby"
-              className="border border-line px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-cream transition-colors duration-300 hover:border-gold/60 hover:text-gold"
-            >
-              Cenník
-            </a>
+              <div className="mt-10 flex flex-wrap items-center gap-4">
+                <Link href="/rezervacia" className={ctaClass("lg")}>
+                  Rezervovať termín{" "}
+                  <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
+                    →
+                  </span>
+                </Link>
+                <a
+                  href="#sluzby"
+                  className="border border-line px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-cream transition-colors duration-300 hover:border-gold/60 hover:text-gold"
+                >
+                  Cenník
+                </a>
+              </div>
+            </div>
+
+            {/* PRAVÁ – ilustrácia majiteľa (priehľadné PNG + zlatý glow) */}
+            <div className="relative flex justify-center lg:justify-end">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at center, rgba(201,169,97,0.16), transparent 62%)",
+                }}
+              />
+              <Image
+                src="/logo-simon.png"
+                alt="Simon'S The Barber"
+                width={1024}
+                height={1024}
+                priority
+                sizes="(max-width: 1024px) 62vw, 40vw"
+                className="relative h-auto w-full max-w-[240px] sm:max-w-xs lg:max-w-md"
+              />
+            </div>
           </div>
         </div>
 
@@ -211,7 +235,7 @@ export default async function HomePage() {
                   vlastnosť filter v style. */}
               <div className="mt-5 overflow-hidden rounded-sm border border-line ring-1 ring-gold/20">
                 <iframe
-                  title="Mapa — Simon's The Barber, Kuklov 12"
+                  title="Mapa — Simon'S The Barber, Kuklov 12"
                   src="https://maps.google.com/maps?q=Kuklov%2012%2C%20908%2078%20Kuklov&output=embed"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
@@ -339,7 +363,7 @@ export default async function HomePage() {
             </a>
           </div>
           <p className="font-mono text-[11px] text-muted">
-            © 2026 Simon The Barber
+            © 2026 Simon&#39;S The Barber
           </p>
         </div>
       </footer>
@@ -444,7 +468,7 @@ function Wordmark({ size = "md" }: { size?: "sm" | "md" }) {
   return (
     <div className="leading-none">
       <div className={`${simon} font-display uppercase leading-none text-cream`}>
-        Simon
+        Simon&#39;s
       </div>
       <div
         className={`${sub} mt-1 font-mono uppercase tracking-[0.35em] text-muted`}

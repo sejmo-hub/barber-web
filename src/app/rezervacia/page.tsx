@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Rezervácia",
   description:
-    "Rezervuj si termín v Simon's The Barber v Kuklove — vyber službu, deň a voľný čas.",
+    "Rezervuj si termín v Simon'S The Barber v Kuklove — vyber službu, deň a voľný čas.",
 };
 
 const DAYS_AHEAD = 14;
@@ -82,9 +82,9 @@ export default async function BookingPage({
       {/* Hlavička konzistentná s hlavnou stránkou */}
       <header className="sticky top-0 z-40 border-b border-line bg-ink/80 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
-          <Link href="/" aria-label="Simon The Barber — domov" className="leading-none">
+          <Link href="/" aria-label="Simon'S The Barber — domov" className="leading-none">
             <span className="block font-display text-xl uppercase leading-none text-cream">
-              Simon
+              Simon&#39;s
             </span>
             <span className="mt-0.5 block font-mono text-[8px] uppercase tracking-[0.35em] text-muted">
               <span className="text-gold">The</span> Barber

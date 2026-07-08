@@ -23,9 +23,9 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link href="/" aria-label="Simon The Barber — domov">
+          <Link href="/" aria-label="Simon'S The Barber — domov">
             <span className="block font-display text-3xl uppercase leading-none text-cream">
-              Simon
+              Simon&#39;s
             </span>
             <span className="mt-1 block font-mono text-[9px] uppercase tracking-[0.4em] text-muted">
               <span className="text-gold">The</span> Barber

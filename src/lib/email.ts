@@ -34,7 +34,7 @@ export async function sendBookingEmails(data: BookingEmailData): Promise<void> {
       const { data: res, error } = await resend.emails.send({
         from,
         to: barberEmail,
-        subject: `Nová rezervácia — ${data.serviceName}, ${data.dateLabel} ${data.time}`,
+        subject: `Simon'S The Barber — nová rezervácia: ${data.serviceName}, ${data.dateLabel} ${data.time}`,
         html: barberHtml(data),
       });
       if (error) console.error("[mail] barberovi zlyhal:", error);
@@ -52,7 +52,7 @@ export async function sendBookingEmails(data: BookingEmailData): Promise<void> {
       const { data: res, error } = await resend.emails.send({
         from,
         to: data.customerEmail,
-        subject: `Potvrdenie rezervácie — ${data.dateLabel} ${data.time}`,
+        subject: `Simon'S The Barber — potvrdenie rezervácie ${data.dateLabel} ${data.time}`,
         html: customerHtml(data),
       });
       if (error) console.error("[mail] zákazníkovi zlyhal:", error);
@@ -85,6 +85,7 @@ function escapeHtml(s: string): string {
 function wrap(inner: string): string {
   return `<!doctype html><html lang="sk"><body style="margin:0;background:#f3f4f6;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
   <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-weight:700;letter-spacing:0.02em;color:#b8935a;font-size:15px;margin-bottom:18px;">Simon'S The Barber</div>
     ${inner}
   </div>
 </body></html>`;

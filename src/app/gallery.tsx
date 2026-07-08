@@ -41,7 +41,7 @@ export function Gallery() {
           >
             <Image
               src={p.src}
-              alt={`Strih ${i + 1} — Simon The Barber`}
+              alt={`Strih ${i + 1} — Simon'S The Barber`}
               width={p.w}
               height={p.h}
               // Na mobile ~50vw (2 stĺpce), na desktope ~33vw (3 stĺpce) →

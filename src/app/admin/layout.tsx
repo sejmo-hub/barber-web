@@ -24,7 +24,7 @@ export default async function AdminLayout({
       <header className="border-b border-line bg-ink2">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-8 gap-y-3 px-4 py-4">
           <span className="text-lg font-semibold tracking-wide">
-            <span className="text-gold">Simon</span> The Barber
+            Simon&#39;S <span className="text-gold">The</span> Barber
             <span className="ml-2 align-middle text-[10px] uppercase tracking-[0.2em] text-muted">
               admin
             </span>

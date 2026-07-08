@@ -2,7 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatServicePrice } from "@/lib/format";
 import { ServiceForm } from "./service-form";
-import { deleteService, toggleService } from "./actions";
+import { toggleService } from "./actions";
+import { DeleteServiceButton } from "./delete-button";
 
 // Vždy čerstvé dáta (admin nástroj – žiadne cachovanie zoznamu).
 export const dynamic = "force-dynamic";
@@ -10,18 +11,30 @@ export const dynamic = "force-dynamic";
 export default async function ServicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; delErr?: string }>;
 }) {
   const sp = await searchParams;
   const services = await prisma.service.findMany({
     orderBy: { createdAt: "desc" },
+    include: { _count: { select: { bookings: true } } },
   });
   const editing = sp.edit ? services.find((s) => s.id === sp.edit) : undefined;
+  const delErrService = sp.delErr
+    ? services.find((s) => s.id === sp.delErr)
+    : undefined;
 
   return (
     <div className="space-y-10">
       <section className="space-y-4">
         <h1 className="text-2xl font-semibold">Služby</h1>
+
+        {delErrService && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            Túto službu („{delErrService.name}“) nemožno zmazať, pretože má
+            existujúce rezervácie. Použi „Deaktivovať“ — služba zmizne z webu aj
+            z rezervácie, ale história ostane.
+          </div>
+        )}
 
         {services.length === 0 ? (
           <p className="text-sm text-muted">
@@ -94,15 +107,11 @@ export default async function ServicesPage({
                             {s.active ? "Deaktivovať" : "Aktivovať"}
                           </button>
                         </form>
-                        <form action={deleteService}>
-                          <input type="hidden" name="id" value={s.id} />
-                          <button
-                            type="submit"
-                            className="rounded-md border border-red-500/30 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
-                          >
-                            Zmazať
-                          </button>
-                        </form>
+                        <DeleteServiceButton
+                          id={s.id}
+                          name={s.name}
+                          hasBookings={s._count.bookings > 0}
+                        />
                       </div>
                     </td>
                   </tr>

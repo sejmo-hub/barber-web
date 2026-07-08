@@ -120,20 +120,19 @@ export async function toggleService(formData: FormData): Promise<void> {
   revalidateServiceViews();
 }
 
-// Zmazanie služby. FK Booking.serviceId má onDelete: Restrict – službu
-// s existujúcimi rezerváciami DB nedovolí zmazať (radšej ju deaktivuj).
-// Chybu zachytíme, nech to nespadne ako 500.
+// Zmazanie služby. Službu s existujúcimi rezerváciami (aj CANCELLED) NEmažeme –
+// FK onDelete: Restrict chráni kalendár/históriu. Vopred skontrolujeme počet
+// rezervácií: ak nejaké má, presmerujeme so ?delErr=<id> a stránka ukáže hlášku.
 export async function deleteService(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  try {
-    await prisma.service.delete({ where: { id } });
-  } catch (err) {
-    console.error(
-      "[deleteService] službu sa nepodarilo zmazať (pravdepodobne má rezervácie):",
-      err,
-    );
+  const bookingCount = await prisma.booking.count({ where: { serviceId: id } });
+  if (bookingCount > 0) {
+    redirect(`/admin/sluzby?delErr=${id}`);
   }
+
+  await prisma.service.delete({ where: { id } }); // bezpečné – 0 rezervácií
   revalidateServiceViews();
+  redirect("/admin/sluzby"); // vyčistí prípadný delErr param
 }
