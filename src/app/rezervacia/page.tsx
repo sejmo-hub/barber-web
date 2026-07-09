@@ -99,7 +99,7 @@ export default async function BookingPage({
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-10 px-4 py-10">
+      <main className="mx-auto max-w-2xl space-y-10 px-4 py-10">
         <div>
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
             Rezervácia
@@ -173,7 +173,7 @@ export default async function BookingPage({
                       href={`/rezervacia?service=${service.id}&date=${c.dateStr}`}
                       aria-current={c.selected ? "true" : undefined}
                       className={
-                        "rounded-sm border px-3 py-2 text-center text-sm transition-colors " +
+                        "rounded-sm border px-3 py-3 text-center text-sm transition-colors " +
                         (c.selected
                           ? "border-gold bg-gold font-medium text-ink"
                           : "border-line bg-panel text-cream hover:border-gold/60")
@@ -185,9 +185,10 @@ export default async function BookingPage({
                     <span
                       key={c.dateStr}
                       title="Zatvorené"
-                      className="cursor-not-allowed rounded-sm border border-dashed border-line px-3 py-2 text-center text-sm text-muted/40"
+                      className="cursor-not-allowed rounded-sm border border-dashed border-line px-3 py-3 text-center text-sm text-muted/40"
                     >
                       {c.label}
+                      <span className="sr-only"> — zatvorené</span>
                     </span>
                   ),
                 )}
@@ -220,9 +221,9 @@ export default async function BookingPage({
                             t,
                           )}`}
                           scroll={false}
-                          aria-pressed={isSel}
+                          aria-current={isSel ? "true" : undefined}
                           className={
-                            "rounded-sm border px-3 py-2 text-center font-mono text-sm transition-colors " +
+                            "rounded-sm border px-3 py-3 text-center font-mono text-sm transition-colors " +
                             (isSel
                               ? "border-gold bg-gold font-medium text-ink"
                               : "border-line bg-panel text-cream hover:border-gold/60")
@@ -256,7 +257,7 @@ export default async function BookingPage({
             )}
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

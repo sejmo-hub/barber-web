@@ -132,7 +132,13 @@ export async function deleteService(formData: FormData): Promise<void> {
     redirect(`/admin/sluzby?delErr=${id}`);
   }
 
-  await prisma.service.delete({ where: { id } }); // bezpečné – 0 rezervácií
+  try {
+    await prisma.service.delete({ where: { id } });
+  } catch {
+    // Race: rezervácia pribudla medzi count a delete (FK Restrict), alebo je
+    // služba už zmazaná – v oboch prípadoch bez 500, ukáž hlášku.
+    redirect(`/admin/sluzby?delErr=${id}`);
+  }
   revalidateServiceViews();
   redirect("/admin/sluzby"); // vyčistí prípadný delErr param
 }

@@ -19,8 +19,11 @@
   --font-mono: var(--font-space-mono);
 }
 
-html {
-  scroll-behavior: smooth;
+/* Plynulé skrolovanie len pre používateľov bez preferencie obmedziť pohyb. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
@@ -50,6 +53,38 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee {
+    animation: none;
+  }
+}
+
+/* Mobilné menu – jemné otvorenie (fade + zosun panelu) */
+@keyframes menu-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes menu-panel {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-menu-fade {
+  animation: menu-fade 0.25s ease-out;
+}
+.animate-menu-panel {
+  animation: menu-panel 0.28s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-menu-fade,
+  .animate-menu-panel {
     animation: none;
   }
 }

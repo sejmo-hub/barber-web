@@ -19,7 +19,7 @@ const anton = Anton({
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   variable: "--font-space-mono",
   display: "swap",
 });
@@ -61,6 +61,7 @@ export default function RootLayout({
   return (
     <html
       lang="sk"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${anton.variable} ${spaceMono.variable}`}
     >
       <body className="antialiased">{children}</body>

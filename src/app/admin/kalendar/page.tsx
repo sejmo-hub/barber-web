@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { BookingStatus } from "@/generated/prisma/client";
-import { formatEur, minutesToHHMM, WEEKDAYS } from "@/lib/format";
+import { formatServicePrice, minutesToHHMM, WEEKDAYS } from "@/lib/format";
 import {
   formatDateOnly,
   formatDateInputUTC,
@@ -14,6 +14,8 @@ import {
 import { CancelButton } from "./cancel-button";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Admin · Kalendár" };
 
 const HOUR_PX = 96; // výška jednej hodiny v px
 const MIN_PX = HOUR_PX / 60;
@@ -166,6 +168,7 @@ export default async function CalendarPage({
               <Link
                 key={v}
                 href={href(v, refDateStr)}
+                aria-current={view === v ? "true" : undefined}
                 className={
                   "rounded px-3 py-1 text-sm " +
                   (view === v
@@ -304,7 +307,7 @@ function TimeGrid({
             ))}
             {/* prázdny deň */}
             {d.bookings.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-[11px] text-muted/50">
+              <div className="absolute inset-0 flex items-center justify-center text-[11px] text-muted/70">
                 {d.isOpen ? "voľné" : "zatvorené"}
               </div>
             )}
@@ -412,7 +415,12 @@ function BookingModal({
     startAt: Date;
     endAt: Date;
     status: string;
-    service: { name: string; durationMin: number; priceCents: number };
+    service: {
+      name: string;
+      durationMin: number;
+      priceCents: number;
+      priceMaxCents: number | null;
+    };
   };
   view: string;
   refDateStr: string;
@@ -430,10 +438,15 @@ function BookingModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* backdrop – klik zavrie */}
       <Link href={closeHref} scroll={false} aria-label="Zavrieť" className="absolute inset-0 bg-black/60" />
-      <div className="relative z-10 w-full max-w-md rounded-t-2xl border border-line bg-panel p-5 shadow-xl sm:rounded-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-modal-title"
+        className="relative z-10 w-full max-w-md rounded-t-2xl border border-line bg-panel p-5 shadow-xl sm:rounded-2xl"
+      >
         <div className="mb-3 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-cream">{booking.customerName}</h2>
+            <h2 id="booking-modal-title" className="text-lg font-semibold text-cream">{booking.customerName}</h2>
             {!isConfirmed && (
               <span className="text-xs font-medium text-red-400">Zrušená rezervácia</span>
             )}
@@ -460,7 +473,9 @@ function BookingModal({
           <DetailRow label="Dátum">{dateLabel}</DetailRow>
           <DetailRow label="Čas">{timeLabel}</DetailRow>
           <DetailRow label="Dĺžka">{durationMin} min</DetailRow>
-          <DetailRow label="Cena">{formatEur(booking.service.priceCents)}</DetailRow>
+          <DetailRow label="Cena">
+            {formatServicePrice(booking.service.priceCents, booking.service.priceMaxCents)}
+          </DetailRow>
         </div>
 
         {isConfirmed ? (

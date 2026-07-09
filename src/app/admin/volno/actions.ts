@@ -48,11 +48,12 @@ export async function createTimeOff(
   return { success: "Voľno bolo pridané." };
 }
 
-// Zmazanie dňa voľna.
+// Zmazanie dňa voľna. deleteMany = idempotentné (dvojklik/stará karta na už
+// zmazanom zázname nespôsobí výnimku P2025).
 export async function deleteTimeOff(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  await prisma.timeOff.delete({ where: { id } });
+  await prisma.timeOff.deleteMany({ where: { id } });
   revalidatePath("/admin/volno");
 }

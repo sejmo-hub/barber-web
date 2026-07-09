@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatServicePrice } from "@/lib/format";
+import { SubmitButton } from "@/components/submit-button";
 import { ServiceForm } from "./service-form";
 import { toggleService } from "./actions";
 import { DeleteServiceButton } from "./delete-button";
 
 // Vždy čerstvé dáta (admin nástroj – žiadne cachovanie zoznamu).
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Admin · Služby" };
 
 export default async function ServicesPage({
   searchParams,
@@ -100,12 +103,12 @@ export default async function ServicesPage({
                         </Link>
                         <form action={toggleService}>
                           <input type="hidden" name="id" value={s.id} />
-                          <button
-                            type="submit"
+                          <SubmitButton
                             className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-cream hover:bg-white/5"
+                            pendingText="Ukladám…"
                           >
                             {s.active ? "Deaktivovať" : "Aktivovať"}
-                          </button>
+                          </SubmitButton>
                         </form>
                         <DeleteServiceButton
                           id={s.id}

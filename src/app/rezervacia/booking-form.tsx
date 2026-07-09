@@ -72,13 +72,16 @@ export function BookingForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="mb-1.5 block font-medium text-cream">Meno</span>
+          <span className="mb-1.5 block font-medium text-cream">
+            Meno a priezvisko
+          </span>
           <input
             type="text"
             name="name"
             required
             minLength={2}
-            placeholder="Meno a priezvisko"
+            maxLength={100}
+            placeholder="napr. Ján Novák"
             className={inputClass}
           />
         </label>
@@ -89,7 +92,8 @@ export function BookingForm({
             name="phone"
             required
             inputMode="tel"
-            placeholder="+421 900 123 456"
+            maxLength={20}
+            placeholder="+421 944 123 456"
             className={inputClass}
           />
         </label>
@@ -103,6 +107,7 @@ export function BookingForm({
           type="email"
           name="email"
           inputMode="email"
+          maxLength={200}
           placeholder="tvoj@email.sk"
           className={inputClass}
         />
@@ -112,7 +117,10 @@ export function BookingForm({
       </label>
 
       {state.status === "error" && (
-        <p className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <p
+          role="alert"
+          className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+        >
           {state.message}
         </p>
       )}

@@ -5,6 +5,8 @@ import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Admin · Prihlásenie" };
+
 export default async function LoginPage({
   searchParams,
 }: {

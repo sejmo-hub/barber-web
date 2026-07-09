@@ -44,11 +44,12 @@ export async function addBlock(
   return { success: "Blok bol pridaný." };
 }
 
-// Zmazanie časového bloku.
+// Zmazanie časového bloku. deleteMany = idempotentné (dvojklik/stará karta na
+// už zmazanom bloku nespôsobí výnimku P2025).
 export async function deleteBlock(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  await prisma.workingHours.delete({ where: { id } });
+  await prisma.workingHours.deleteMany({ where: { id } });
   revalidatePath("/admin/hodiny");
 }

@@ -134,12 +134,12 @@ export function ServiceForm({ editing }: { editing?: EditingService }) {
       </label>
 
       {state.error && (
-        <p className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <p role="alert" className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p className="rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+        <p role="status" className="rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
           {state.success}
         </p>
       )}

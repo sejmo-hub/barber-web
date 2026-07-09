@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { BookingStatus } from "@/generated/prisma/client";
-import { formatEur, hhmmToMinutes } from "@/lib/format";
+import { formatServicePrice, hhmmToMinutes } from "@/lib/format";
 import {
   localDateStringToUTC,
   localMinutesToUtc,
@@ -60,15 +60,17 @@ export async function createBooking(
   const dayAnchor = localDateStringToUTC(dateStr);
   const minutes = hhmmToMinutes(time);
   if (!dayAnchor || minutes === null) {
-    return { status: "error", message: "Neplatný termín. Vyberte prosím znova." };
+    return { status: "error", message: "Neplatný termín. Vyber ho prosím znova." };
   }
   if (dayAnchor < todayLocalStartUTC()) {
     return { status: "error", message: "Tento deň už nie je možné rezervovať." };
   }
 
-  // 1) Znova načítaj službu z DB (trvanie + že je aktívna) – never klientovi.
+  // 1) Znova načítaj službu z DB (trvanie + že je aktívna a rezervovateľná) –
+  //    never klientovi. bookable=false služby sa v /rezervacia neponúkajú, ale
+  //    priamym POST-om by sa inak dali obísť, preto ich odmietame aj tu.
   const service = await prisma.service.findUnique({ where: { id: serviceId } });
-  if (!service || !service.active) {
+  if (!service || !service.active || !service.bookable) {
     return { status: "error", message: "Vybraná služba už nie je dostupná." };
   }
 
@@ -81,7 +83,7 @@ export async function createBooking(
   if (!freeSlots.includes(time)) {
     return {
       status: "error",
-      message: "Tento termín bol práve obsadený, vyberte prosím iný.",
+      message: "Tento termín bol práve obsadený, vyber si prosím iný.",
     };
   }
 
@@ -102,13 +104,13 @@ export async function createBooking(
     if (isOverlapError(err)) {
       return {
         status: "error",
-        message: "Tento termín bol práve obsadený, vyberte prosím iný.",
+        message: "Tento termín bol práve obsadený, vyber si prosím iný.",
       };
     }
     // Iná chyba – stále pekná hláška pre zákazníka, nie 500.
     return {
       status: "error",
-      message: "Rezerváciu sa nepodarilo uložiť. Skúste to prosím znova.",
+      message: "Rezerváciu sa nepodarilo uložiť. Skús to prosím znova.",
     };
   }
 
@@ -122,7 +124,7 @@ export async function createBooking(
       dateLabel,
       time,
       durationMin: service.durationMin,
-      priceLabel: formatEur(service.priceCents),
+      priceLabel: formatServicePrice(service.priceCents, service.priceMaxCents),
       customerName: name,
       customerPhone: phone,
       customerEmail,

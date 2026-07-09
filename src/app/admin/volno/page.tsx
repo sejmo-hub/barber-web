@@ -5,11 +5,14 @@ import {
   formatDateInputUTC,
   todayLocalStartUTC,
 } from "@/lib/date";
+import { SubmitButton } from "@/components/submit-button";
 import { TimeOffForm } from "./timeoff-form";
 import { deleteTimeOff } from "./actions";
 
 // Vždy čerstvé dáta (admin nástroj – žiadne cachovanie zoznamu).
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Admin · Voľno" };
 
 export default async function TimeOffPage() {
   const today = todayLocalStartUTC();
@@ -66,12 +69,13 @@ export default async function TimeOffPage() {
                       <div className="flex justify-end">
                         <form action={deleteTimeOff}>
                           <input type="hidden" name="id" value={t.id} />
-                          <button
-                            type="submit"
+                          <SubmitButton
                             className="rounded-md border border-red-500/30 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10"
+                            pendingText="Mažem…"
+                            confirmMessage={`Naozaj zmazať voľno ${formatDateOnly(t.date)}?`}
                           >
                             Zmazať
-                          </button>
+                          </SubmitButton>
                         </form>
                       </div>
                     </td>

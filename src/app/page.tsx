@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { minutesToHHMM, WEEKDAYS, formatServicePrice } from "@/lib/format";
 import { isoWeekdayUTC, todayLocalStartUTC } from "@/lib/date";
 import { Gallery } from "./gallery";
+import { MobileNav } from "./mobile-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -57,12 +58,16 @@ export default async function HomePage() {
             <a href="#galeria" className="transition-colors hover:text-cream">Galéria</a>
             <a href="#kontakt" className="transition-colors hover:text-cream">Kontakt</a>
           </nav>
-          <Link href="/rezervacia" className={ctaClass("sm")}>
-            Rezervovať
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/rezervacia" className={ctaClass("sm")}>
+              Rezervovať
+            </Link>
+            <MobileNav />
+          </div>
         </div>
       </header>
 
+      <main>
       {/* ============ HERO ============ */}
       <section className="relative flex min-h-[92vh] flex-col overflow-hidden">
         {/* pozadie = miesto pre veľkú hero fotku */}
@@ -129,9 +134,17 @@ export default async function HomePage() {
                 <span className="h-px flex-1 bg-gradient-to-r from-gold/50 to-transparent" />
               </div>
 
-              <p className="mt-8 max-w-lg text-lg leading-relaxed text-cream/90">
-                Precízny fade, ostrá linka, poctivé remeslo. Barbershop pre
-                chlapov, ktorí vedia, ako chcú vyzerať.
+              {/* Barberovo motto z cenníka – citát, "fresh" zlatou, zlatá korunka */}
+              <p className="mt-8 max-w-lg text-lg italic leading-relaxed text-cream/90">
+                &bdquo;Príď si pre strih a buď stále{" "}
+                <span className="not-italic font-medium text-gold underline decoration-gold/40 underline-offset-4">
+                  fresh
+                </span>{" "}
+                aj hore aj{" "}
+                <span className="whitespace-nowrap">
+                  dole&ldquo;{" "}
+                  <CrownIcon className="ml-1 inline-block h-[1.1em] w-[1.1em] -translate-y-[0.15em] text-gold" />
+                </span>
               </p>
 
               <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -152,23 +165,27 @@ export default async function HomePage() {
 
             {/* PRAVÁ – ilustrácia majiteľa (priehľadné PNG + zlatý glow) */}
             <div className="relative flex justify-center lg:justify-end">
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  backgroundImage:
-                    "radial-gradient(circle at center, rgba(201,169,97,0.16), transparent 62%)",
-                }}
-              />
-              <Image
-                src="/logo-simon.png"
-                alt="Simon'S The Barber"
-                width={1024}
-                height={1024}
-                priority
-                sizes="(max-width: 1024px) 62vw, 40vw"
-                className="relative h-auto w-full max-w-[240px] sm:max-w-xs lg:max-w-md"
-              />
+              <div className="relative w-full max-w-[240px] sm:max-w-xs lg:max-w-md">
+                {/* Glow väčší než obrázok, mäkko vyprchá do transparent dávno
+                    pred vlastnou hranou – žiadne orezané okraje. */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-[170%] w-[170%] -translate-x-1/2 -translate-y-1/2"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(closest-side, rgba(201,169,97,0.20), rgba(201,169,97,0.07) 45%, transparent 72%)",
+                  }}
+                />
+                <Image
+                  src="/logo-simon.png"
+                  alt="Simon'S The Barber"
+                  width={1024}
+                  height={1024}
+                  priority
+                  sizes="(max-width: 1024px) 62vw, 40vw"
+                  className="relative h-auto w-full"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -330,6 +347,8 @@ export default async function HomePage() {
         </div>
       </section>
 
+      </main>
+
       {/* ============ PÄTIČKA ============ */}
       <footer className="relative overflow-hidden border-t border-gold/20">
         <span
@@ -372,6 +391,22 @@ export default async function HomePage() {
 }
 
 // ---- Pomocné komponenty ---------------------------------------------------
+
+// Zlatá korunka k mottu (SVG namiesto emoji – konzistentná na všetkých
+// zariadeniach). Dedí farbu cez currentColor.
+function CrownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M3 7.5 7.2 11 12 4.5 16.8 11 21 7.5l-1.6 9H4.6L3 7.5Z" />
+      <rect x="4.4" y="18" width="15.2" height="1.8" rx="0.5" />
+    </svg>
+  );
+}
 
 function ServiceCard({
   s,

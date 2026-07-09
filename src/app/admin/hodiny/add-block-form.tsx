@@ -41,10 +41,10 @@ export function AddBlockForm({ weekday }: { weekday: number }) {
       </button>
 
       {state.error && (
-        <p className="w-full text-sm text-red-400">{state.error}</p>
+        <p role="alert" className="w-full text-sm text-red-400">{state.error}</p>
       )}
       {state.success && (
-        <p className="w-full text-sm text-emerald-300">{state.success}</p>
+        <p role="status" className="w-full text-sm text-emerald-300">{state.success}</p>
       )}
     </form>
   );

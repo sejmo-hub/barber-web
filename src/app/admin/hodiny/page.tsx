@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { WEEKDAYS, minutesToHHMM } from "@/lib/format";
+import { SubmitButton } from "@/components/submit-button";
 import { AddBlockForm } from "./add-block-form";
 import { deleteBlock } from "./actions";
 
 // Vždy čerstvé dáta (admin nástroj – žiadne cachovanie zoznamu).
 export const dynamic = "force-dynamic";
+
+export const metadata = { title: "Admin · Pracovné hodiny" };
 
 export default async function HoursPage() {
   const blocks = await prisma.workingHours.findMany({
@@ -50,13 +53,13 @@ export default async function HoursPage() {
                       </span>
                       <form action={deleteBlock}>
                         <input type="hidden" name="id" value={b.id} />
-                        <button
-                          type="submit"
-                          aria-label="Zmazať blok"
+                        <SubmitButton
+                          ariaLabel="Zmazať blok"
                           className="text-muted hover:text-red-400"
+                          confirmMessage={`Naozaj zmazať blok ${day.label} ${minutesToHHMM(b.startMinute)}–${minutesToHHMM(b.endMinute)}?`}
                         >
                           ✕
-                        </button>
+                        </SubmitButton>
                       </form>
                     </li>
                   ))}
