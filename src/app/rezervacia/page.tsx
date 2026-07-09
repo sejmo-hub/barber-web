@@ -45,11 +45,13 @@ export default async function BookingPage({
     dateStr: string;
     label: string;
     available: boolean;
+    reason: "closed" | "today-full" | null;
     selected: boolean;
   }[] = [];
   let selectedDate: Date | null = null;
   let slots: string[] = [];
   let selectedSlot: string | null = null;
+  let todayFull = false;
 
   if (service) {
     const whWeekdays = new Set(
@@ -58,20 +60,43 @@ export default async function BookingPage({
       ),
     );
     const today = todayLocalStartUTC();
+    const todayStr = formatDateInputUTC(today);
+    // Voľné sloty pre dnešok (s predstihom) – rozhodujú, či je dnešok klikateľný.
+    const todayFreeSlots = await computeFreeSlots(service.durationMin, today);
+
     for (let i = 0; i < DAYS_AHEAD; i++) {
       const d = new Date(today.getTime() + i * 86_400_000);
       const dateStr = formatDateInputUTC(d);
       const wd = isoWeekdayUTC(d);
+      const isToday = i === 0;
+      const worksThatDay = whWeekdays.has(wd);
+      // Dnešok je dostupný len ak má ešte aspoň jeden platný slot (nie minulosť
+      // ani do 30 min). Minulé dni sa v zozname vôbec neobjavia (loop od dnes).
+      const available = isToday
+        ? worksThatDay && todayFreeSlots.length > 0
+        : worksThatDay;
+      const reason: "closed" | "today-full" | null = available
+        ? null
+        : isToday && worksThatDay
+          ? "today-full"
+          : "closed";
+      if (reason === "today-full") todayFull = true;
       dayCells.push({
         dateStr,
         label: `${WEEKDAYS[wd - 1].label.slice(0, 2)} ${formatDateOnly(d)}`,
-        available: whWeekdays.has(wd),
+        available,
+        reason,
         selected: sp.date === dateStr,
       });
     }
+
     selectedDate = sp.date ? localDateStringToUTC(sp.date) : null;
     if (selectedDate) {
-      slots = await computeFreeSlots(service.durationMin, selectedDate);
+      // Dnešok už máme spočítaný – zbytočne nevoláme DB druhýkrát.
+      slots =
+        sp.date === todayStr
+          ? todayFreeSlots
+          : await computeFreeSlots(service.durationMin, selectedDate);
       selectedSlot =
         sp.slot && hhmmToMinutes(sp.slot) !== null ? sp.slot : null;
     }
@@ -184,15 +209,28 @@ export default async function BookingPage({
                   ) : (
                     <span
                       key={c.dateStr}
-                      title="Zatvorené"
+                      title={
+                        c.reason === "today-full"
+                          ? "Dnes už nie sú voľné termíny"
+                          : "Zatvorené"
+                      }
                       className="cursor-not-allowed rounded-sm border border-dashed border-line px-3 py-3 text-center text-sm text-muted/40"
                     >
                       {c.label}
-                      <span className="sr-only"> — zatvorené</span>
+                      <span className="sr-only">
+                        {c.reason === "today-full"
+                          ? " — dnes už nie sú voľné termíny"
+                          : " — zatvorené"}
+                      </span>
                     </span>
                   ),
                 )}
               </div>
+              {todayFull && (
+                <p className="text-xs text-muted">
+                  Dnes už nie sú voľné termíny — vyber si niektorý z ďalších dní.
+                </p>
+              )}
             </section>
 
             {/* KROK 3 – voľné sloty */}

@@ -12,6 +12,7 @@ import {
   utcToLocalParts,
 } from "@/lib/date";
 import { CancelButton } from "./cancel-button";
+import { RescheduleForm } from "./reschedule-form";
 
 export const dynamic = "force-dynamic";
 
@@ -442,7 +443,7 @@ function BookingModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="booking-modal-title"
-        className="relative z-10 w-full max-w-md rounded-t-2xl border border-line bg-panel p-5 shadow-xl sm:rounded-2xl"
+        className="relative z-10 max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-line bg-panel p-5 shadow-xl sm:rounded-2xl"
       >
         <div className="mb-3 flex items-start justify-between gap-4">
           <div>
@@ -479,12 +480,24 @@ function BookingModal({
         </div>
 
         {isConfirmed ? (
-          <CancelButton
-            id={booking.id}
-            view={view}
-            date={refDateStr}
-            confirmLabel={`${booking.customerName}, ${dateLabel} ${minutesToHHMM(s.minutes)}`}
-          />
+          <div className="space-y-2">
+            <RescheduleForm
+              bookingId={booking.id}
+              customerName={booking.customerName}
+              customerEmail={booking.customerEmail}
+              currentDateStr={s.dateStr}
+              currentDateLabel={dateLabel}
+              currentTimeLabel={minutesToHHMM(s.minutes)}
+              view={view}
+              refDateStr={refDateStr}
+            />
+            <CancelButton
+              id={booking.id}
+              view={view}
+              date={refDateStr}
+              confirmLabel={`${booking.customerName}, ${dateLabel} ${minutesToHHMM(s.minutes)}`}
+            />
+          </div>
         ) : (
           <Link
             href={closeHref}

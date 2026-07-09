@@ -141,3 +141,69 @@ function customerHtml(d: BookingEmailData): string {
      </p>`,
   );
 }
+
+// --- Presun termínu (admin) ----------------------------------------------
+
+export type RescheduleEmailData = {
+  serviceName: string;
+  oldDateLabel: string;
+  oldTime: string;
+  newDateLabel: string;
+  newTime: string;
+  durationMin: number;
+  priceLabel: string;
+  customerName: string;
+  customerEmail: string; // volať len ak zákazník e-mail zadal
+};
+
+// E-mail zákazníkovi o presune termínu. Vlastný try/catch – zlyhanie odoslania
+// NESMIE zhodiť už uložený presun (volajúci to má navyše v try/catch).
+export async function sendRescheduleEmail(
+  data: RescheduleEmailData,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM;
+  if (!apiKey || !from) {
+    console.warn(
+      "[mail] RESEND_API_KEY alebo MAIL_FROM nie je nastavené – e-mail o presune preskočený.",
+    );
+    return;
+  }
+  const resend = new Resend(apiKey);
+  try {
+    const { data: res, error } = await resend.emails.send({
+      from,
+      to: data.customerEmail,
+      subject: "Zmena termínu — Simon'S The Barber",
+      html: rescheduleHtml(data),
+    });
+    if (error) console.error("[mail] presun zákazníkovi zlyhal:", error);
+    else
+      console.log(
+        `[mail] presun zákazníkovi odoslaný → ${data.customerEmail} (id ${res?.id})`,
+      );
+  } catch (e) {
+    console.error("[mail] presun výnimka:", e);
+  }
+}
+
+function rescheduleHtml(d: RescheduleEmailData): string {
+  const rows = [
+    detailRow("Služba", d.serviceName),
+    detailRow("Pôvodný termín", `${d.oldDateLabel} o ${d.oldTime}`),
+    detailRow("Nový termín", `${d.newDateLabel} o ${d.newTime}`),
+    detailRow("Dĺžka", `${d.durationMin} min`),
+    detailRow("Cena", d.priceLabel),
+  ];
+  return wrap(
+    `<h1 style="margin:0;font-size:20px;">Zmena termínu</h1>
+     <p style="margin:8px 0 0;color:#374151;font-size:14px;">
+       Ahoj ${escapeHtml(d.customerName)}, tvoj termín v Simon'S The Barber sme
+       presunuli. Nižšie nájdeš nové detaily.
+     </p>
+     ${detailsTable(rows)}
+     <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
+       Ak ti nový termín nevyhovuje, daj nám prosím vedieť.
+     </p>`,
+  );
+}

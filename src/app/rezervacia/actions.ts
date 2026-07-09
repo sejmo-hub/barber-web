@@ -9,7 +9,7 @@ import {
   todayLocalStartUTC,
   formatDateOnly,
 } from "@/lib/date";
-import { computeFreeSlots } from "@/lib/slots";
+import { computeFreeSlots, MIN_LEAD_TIME_MIN } from "@/lib/slots";
 import { sendBookingEmails } from "@/lib/email";
 
 export type BookingResult =
@@ -77,6 +77,18 @@ export async function createBooking(
   // 2) Prepočítaj startAt/endAt cez TZ helpery (lokálny čas → UTC).
   const startAt = localMinutesToUtc(dayAnchor, minutes);
   const endAt = new Date(startAt.getTime() + service.durationMin * 60_000);
+
+  // 2b) Minulosť / predstih: stránka mohla byť otvorená dlho a slot medzitým
+  //     „vypršal". Znova over v absolútnom UTC čase (žiadne ručné +2h), aby sa
+  //     nedalo rezervovať do minulosti ani na poslednú chvíľu – ani priamym POST-om.
+  const earliestStartUtc = new Date(Date.now() + MIN_LEAD_TIME_MIN * 60_000);
+  if (startAt < earliestStartUtc) {
+    return {
+      status: "error",
+      message:
+        "Tento termín už nie je možné rezervovať. Vyberte prosím neskorší čas.",
+    };
+  }
 
   // 3) Server-side re-validácia: je slot STÁLE voľný? (rovnaká logika ako displej)
   const freeSlots = await computeFreeSlots(service.durationMin, dayAnchor);

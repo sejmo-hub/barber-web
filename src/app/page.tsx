@@ -140,7 +140,7 @@ export default async function HomePage() {
                 <span className="not-italic font-medium text-gold underline decoration-gold/40 underline-offset-4">
                   fresh
                 </span>{" "}
-                aj hore aj{" "}
+                hore aj{" "}
                 <span className="whitespace-nowrap">
                   dole&ldquo;{" "}
                   <CrownIcon className="ml-1 inline-block h-[1.1em] w-[1.1em] -translate-y-[0.15em] text-gold" />
