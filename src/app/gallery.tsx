@@ -33,11 +33,11 @@ export function Gallery() {
 
   return (
     <>
-      <div className="mt-12 columns-2 gap-4 md:columns-3">
+      <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-3">
         {visible.map((p, i) => (
           <figure
             key={p.src}
-            className="group relative mb-4 block break-inside-avoid overflow-hidden border border-line bg-ink2"
+            className="group relative block aspect-[4/5] overflow-hidden rounded-lg border border-line bg-ink2"
           >
             <Image
               src={p.src}
@@ -47,7 +47,7 @@ export function Gallery() {
               // Na mobile ~50vw (2 stĺpce), na desktope ~33vw (3 stĺpce) →
               // prehliadač si stiahne menšiu verziu, nie plnú veľkosť.
               sizes="(max-width: 768px) 50vw, 33vw"
-              className="h-auto w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             />
             <span className="pointer-events-none absolute inset-0 border border-transparent transition-colors duration-300 group-hover:border-gold/40" />
           </figure>
