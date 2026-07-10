@@ -105,6 +105,35 @@ export async function updateService(
   redirect("/admin/sluzby"); // ukončí režim úpravy
 }
 
+// Posun služby v poradí (šípky hore/dole). Prehodí ju so susedom a prečísluje
+// všetky sortOrdery na 1..N (kontiguálne, stabilné aj keď boli pôvodne rovnaké/0).
+export async function moveService(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  const dir = String(formData.get("dir") ?? "");
+  if (!id || (dir !== "up" && dir !== "down")) return;
+
+  const services = await prisma.service.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true },
+  });
+  const i = services.findIndex((s) => s.id === id);
+  if (i === -1) return;
+  const j = dir === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= services.length) return; // už na kraji
+
+  [services[i], services[j]] = [services[j], services[i]];
+
+  await prisma.$transaction(
+    services.map((s, idx) =>
+      prisma.service.update({
+        where: { id: s.id },
+        data: { sortOrder: idx + 1 },
+      }),
+    ),
+  );
+  revalidateServiceViews();
+}
+
 // Prepnutie active (aktivovať / deaktivovať).
 export async function toggleService(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");

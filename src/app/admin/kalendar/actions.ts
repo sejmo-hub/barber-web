@@ -38,7 +38,7 @@ export async function cancelBooking(formData: FormData): Promise<void> {
   }
 
   const q = new URLSearchParams();
-  q.set("view", view === "day" ? "day" : "week");
+  if (view === "day" || view === "week") q.set("view", view); // "" = default
   if (date) q.set("date", date);
   redirect(`/admin/kalendar?${q.toString()}`); // zavrie detail (bez booking=)
 }
@@ -204,7 +204,7 @@ export async function rescheduleBooking(
   revalidatePath("/rezervacia"); // pôvodný slot je zas voľný vo verejnom flow
 
   const q = new URLSearchParams();
-  q.set("view", view === "day" ? "day" : "week");
+  if (view === "day" || view === "week") q.set("view", view); // "" = default
   if (date) q.set("date", date);
   redirect(`/admin/kalendar?${q.toString()}`); // zavrie modal + refresh
 }

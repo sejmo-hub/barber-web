@@ -18,8 +18,10 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Admin · Kalendár" };
 
-const HOUR_PX = 96; // výška jednej hodiny v px
-const MIN_PX = HOUR_PX / 60;
+// Výška jednej hodiny (px). Týždeň = kompaktný (celý deň sa zmestí bez scrollu),
+// deň = vyšší (bloky ako tap-targety ≥44px na mobile; vertikálny scroll je OK).
+const HOUR_PX_WEEK = 46;
+const HOUR_PX_DAY = 88;
 const DAY_MS = 86_400_000;
 
 type BlockData = {
@@ -32,7 +34,7 @@ type BlockData = {
 };
 type DayData = {
   dateStr: string;
-  weekdayLabel: string;
+  weekdayShort: string;
   dayMonth: string;
   isToday: boolean;
   isOpen: boolean;
@@ -47,8 +49,11 @@ function rezervacieLabel(n: number): string {
   return `${n} rezervácií`;
 }
 
-function href(view: string, dateStr: string): string {
-  return `/admin/kalendar?view=${view}&date=${dateStr}`;
+// URL kalendára. viewParam môže byť "" (default = responzívne: desktop týždeň,
+// mobil deň) – vtedy sa view do URL nedáva, aby sa default zachoval.
+function href(viewParam: string, dateStr: string): string {
+  const v = viewParam ? `view=${viewParam}&` : "";
+  return `/admin/kalendar?${v}date=${dateStr}`;
 }
 
 export default async function CalendarPage({
@@ -57,32 +62,38 @@ export default async function CalendarPage({
   searchParams: Promise<{ view?: string; date?: string; booking?: string }>;
 }) {
   const sp = await searchParams;
-  const view = sp.view === "day" ? "day" : "week";
+  // rawView: explicitne zvolený pohľad (alebo undefined = default).
+  const rawView =
+    sp.view === "day" ? "day" : sp.view === "week" ? "week" : undefined;
+  const viewParam = rawView ?? "";
+  const view = rawView ?? "week"; // pre dáta + desktop default
+
   const today = todayLocalStartUTC();
-  const refDate =
-    (sp.date && localDateStringToUTC(sp.date)) || today;
+  const refDate = (sp.date && localDateStringToUTC(sp.date)) || today;
   const refDateStr = formatDateInputUTC(refDate);
 
-  // Dni na zobrazenie (kotvy = UTC polnoc lokálneho dňa).
-  const dayAnchors: Date[] = [];
-  if (view === "week") {
-    const monday = new Date(refDate.getTime() - (isoWeekdayUTC(refDate) - 1) * DAY_MS);
-    for (let i = 0; i < 7; i++) dayAnchors.push(new Date(monday.getTime() + i * DAY_MS));
-  } else {
-    dayAnchors.push(refDate);
-  }
+  // Vždy postavíme celý týždeň (7 dní) – deň grid si potom vyberie refDate.
+  const monday = new Date(
+    refDate.getTime() - (isoWeekdayUTC(refDate) - 1) * DAY_MS,
+  );
+  const weekAnchors: Date[] = [];
+  for (let i = 0; i < 7; i++)
+    weekAnchors.push(new Date(monday.getTime() + i * DAY_MS));
 
   // Pracovné hodiny (na časovú os aj tieňovanie).
   const wh = await prisma.workingHours.findMany({
     select: { weekday: true, startMinute: true, endMinute: true },
   });
-  const whByWeekday = new Map<number, { startMinute: number; endMinute: number }[]>();
+  const whByWeekday = new Map<
+    number,
+    { startMinute: number; endMinute: number }[]
+  >();
   for (const w of wh) {
     const arr = whByWeekday.get(w.weekday) ?? [];
     arr.push({ startMinute: w.startMinute, endMinute: w.endMinute });
     whByWeekday.set(w.weekday, arr);
   }
-  // Časová os z pracovných hodín (zaokrúhlená na hodinu, malá rezerva). Fallback 8–18.
+  // Časová os z pracovných hodín (zaokrúhlená na hodinu). Fallback 8–18.
   let axisStart = 8 * 60;
   let axisEnd = 18 * 60;
   if (wh.length > 0) {
@@ -93,9 +104,9 @@ export default async function CalendarPage({
     if (axisEnd - axisStart < 120) axisEnd = axisStart + 120;
   }
 
-  // CONFIRMED rezervácie v zobrazenom rozsahu.
-  const rangeStartUtc = localMinutesToUtc(dayAnchors[0], 0);
-  const rangeEndUtc = localMinutesToUtc(dayAnchors[dayAnchors.length - 1], 24 * 60);
+  // CONFIRMED rezervácie v rozsahu týždňa.
+  const rangeStartUtc = localMinutesToUtc(weekAnchors[0], 0);
+  const rangeEndUtc = localMinutesToUtc(weekAnchors[6], 24 * 60);
   const bookings = await prisma.booking.findMany({
     where: {
       status: BookingStatus.CONFIRMED,
@@ -106,7 +117,6 @@ export default async function CalendarPage({
     orderBy: { startAt: "asc" },
   });
 
-  // Rezervácie zoskupené podľa lokálneho dňa.
   const blocksByDay = new Map<string, BlockData[]>();
   for (const b of bookings) {
     const s = utcToLocalParts(b.startAt);
@@ -123,12 +133,12 @@ export default async function CalendarPage({
     blocksByDay.set(s.dateStr, arr);
   }
 
-  const days: DayData[] = dayAnchors.map((anchor) => {
+  const weekDays: DayData[] = weekAnchors.map((anchor) => {
     const dateStr = formatDateInputUTC(anchor);
     const iso = isoWeekdayUTC(anchor);
     return {
       dateStr,
-      weekdayLabel: WEEKDAYS[iso - 1].label,
+      weekdayShort: WEEKDAYS[iso - 1].label.slice(0, 2),
       dayMonth: `${anchor.getUTCDate()}.${anchor.getUTCMonth() + 1}.`,
       isToday: anchor.getTime() === today.getTime(),
       isOpen: (whByWeekday.get(iso)?.length ?? 0) > 0,
@@ -136,6 +146,8 @@ export default async function CalendarPage({
       bookings: blocksByDay.get(dateStr) ?? [],
     };
   });
+  const refDay =
+    weekDays.find((d) => d.dateStr === refDateStr) ?? weekDays[0];
 
   // Detail rezervácie (modal), ak je booking v URL.
   const detail = sp.booking
@@ -145,89 +157,153 @@ export default async function CalendarPage({
       })
     : null;
 
-  const step = view === "week" ? 7 : 1;
-  const prevStr = formatDateInputUTC(new Date(refDate.getTime() - step * DAY_MS));
-  const nextStr = formatDateInputUTC(new Date(refDate.getTime() + step * DAY_MS));
   const todayStr = formatDateInputUTC(today);
+  const shift = (days: number) =>
+    formatDateInputUTC(new Date(refDate.getTime() + days * DAY_MS));
+  // Krok navigácie: desktop podľa view, mobil deň (7 len ak explicitný týždeň).
+  const desktopStep = view === "day" ? 1 : 7;
+  const mobileStep = rawView === "week" ? 7 : 1;
 
-  const rangeTitle =
-    view === "week"
-      ? `${formatDateOnly(dayAnchors[0])} – ${formatDateOnly(dayAnchors[6])}`
-      : `${WEEKDAYS[isoWeekdayUTC(refDate) - 1].label} ${formatDateOnly(refDate)}`;
+  const weekRange = `${formatDateOnly(weekAnchors[0])} – ${formatDateOnly(weekAnchors[6])}`;
+  const dayTitle = `${WEEKDAYS[isoWeekdayUTC(refDate) - 1].label} ${formatDateOnly(refDate)}`;
 
   return (
     <div>
       {/* Ovládanie */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-cream">Kalendár</h1>
-          <p className="text-sm text-muted">{rangeTitle}</p>
+          {/* podnadpis: desktop podľa view, mobil podľa mobilného pohľadu */}
+          <p className="hidden text-sm text-muted md:block">
+            {view === "day" ? dayTitle : weekRange}
+          </p>
+          <p className="text-sm text-muted md:hidden">
+            {rawView === "week" ? weekRange : dayTitle}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-md border border-line p-0.5">
-            {(["week", "day"] as const).map((v) => (
-              <Link
-                key={v}
-                href={href(v, refDateStr)}
-                aria-current={view === v ? "true" : undefined}
-                className={
-                  "rounded px-3 py-1 text-sm " +
-                  (view === v
-                    ? "bg-gold font-medium text-ink"
-                    : "text-muted hover:text-cream")
-                }
-              >
-                {v === "week" ? "Týždeň" : "Deň"}
-              </Link>
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
-            <Link
-              href={href(view, prevStr)}
-              aria-label="Predošlé"
-              className="rounded-md border border-line px-2.5 py-1 text-cream hover:border-gold/60"
-            >
-              ‹
-            </Link>
-            <Link
-              href={href(view, todayStr)}
-              className="rounded-md border border-line px-3 py-1 text-sm text-cream hover:border-gold/60"
-            >
-              Dnes
-            </Link>
-            <Link
-              href={href(view, nextStr)}
-              aria-label="Nasledujúce"
-              className="rounded-md border border-line px-2.5 py-1 text-cream hover:border-gold/60"
-            >
-              ›
-            </Link>
-          </div>
+
+        {/* DESKTOP nav */}
+        <div className="hidden items-center gap-2 md:flex">
+          <ViewToggle refDateStr={refDateStr} active={view} />
+          <NavArrows
+            prevHref={href(viewParam, shift(-desktopStep))}
+            todayHref={href(viewParam, todayStr)}
+            nextHref={href(viewParam, shift(desktopStep))}
+          />
+        </div>
+
+        {/* MOBIL nav */}
+        <div className="flex items-center gap-2 md:hidden">
+          <ViewToggle
+            refDateStr={refDateStr}
+            active={rawView === "week" ? "week" : "day"}
+          />
+          <NavArrows
+            prevHref={href(viewParam, shift(-mobileStep))}
+            todayHref={href(viewParam, todayStr)}
+            nextHref={href(viewParam, shift(mobileStep))}
+          />
         </div>
       </div>
 
-      {/* Deň: časová mriežka (funguje aj na mobile). Týždeň: mriežka na desktope,
-          zoznam na mobile. */}
-      {view === "day" ? (
-        <TimeGrid days={days} axisStart={axisStart} axisEnd={axisEnd} view={view} refDateStr={refDateStr} />
-      ) : (
-        <>
-          <div className="hidden md:block">
-            <TimeGrid days={days} axisStart={axisStart} axisEnd={axisEnd} view={view} refDateStr={refDateStr} />
-          </div>
-          <div className="md:hidden">
-            <WeekList days={days} view={view} refDateStr={refDateStr} />
-          </div>
-        </>
-      )}
+      {/* DESKTOP: týždeň grid (kompaktný) alebo deň grid */}
+      <div className="hidden md:block">
+        {rawView === "day" ? (
+          <TimeGrid
+            days={[refDay]}
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+            hourPx={HOUR_PX_DAY}
+            viewParam={viewParam}
+            refDateStr={refDateStr}
+          />
+        ) : (
+          <TimeGrid
+            days={weekDays}
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+            hourPx={HOUR_PX_WEEK}
+            viewParam={viewParam}
+            refDateStr={refDateStr}
+          />
+        )}
+      </div>
+
+      {/* MOBIL: default/deň = denný grid; explicitný týždeň = zoznam */}
+      <div className="md:hidden">
+        {rawView === "week" ? (
+          <WeekList days={weekDays} viewParam={viewParam} refDateStr={refDateStr} />
+        ) : (
+          <TimeGrid
+            days={[refDay]}
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+            hourPx={HOUR_PX_DAY}
+            viewParam={viewParam}
+            refDateStr={refDateStr}
+          />
+        )}
+      </div>
 
       {detail && (
-        <BookingModal
-          booking={detail}
-          view={view}
-          refDateStr={refDateStr}
-        />
+        <BookingModal booking={detail} viewParam={viewParam} refDateStr={refDateStr} />
       )}
+    </div>
+  );
+}
+
+// ---- Ovládacie prvky ------------------------------------------------------
+
+function ViewToggle({
+  refDateStr,
+  active,
+}: {
+  refDateStr: string;
+  active: "week" | "day";
+}) {
+  return (
+    <div className="flex rounded-md border border-line p-0.5">
+      {(["week", "day"] as const).map((v) => (
+        <Link
+          key={v}
+          href={href(v, refDateStr)}
+          aria-current={active === v ? "true" : undefined}
+          className={
+            "flex min-h-[44px] items-center rounded px-3 py-1 text-sm md:min-h-[36px] " +
+            (active === v
+              ? "bg-gold font-medium text-ink"
+              : "text-muted hover:text-cream")
+          }
+        >
+          {v === "week" ? "Týždeň" : "Deň"}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function NavArrows({
+  prevHref,
+  todayHref,
+  nextHref,
+}: {
+  prevHref: string;
+  todayHref: string;
+  nextHref: string;
+}) {
+  const btn =
+    "flex min-h-[44px] items-center justify-center rounded-md border border-line text-cream hover:border-gold/60 md:min-h-[36px]";
+  return (
+    <div className="flex items-center gap-1">
+      <Link href={prevHref} aria-label="Predošlé" className={`${btn} w-11 md:w-9`}>
+        ‹
+      </Link>
+      <Link href={todayHref} className={`${btn} px-3 text-sm`}>
+        Dnes
+      </Link>
+      <Link href={nextHref} aria-label="Nasledujúce" className={`${btn} w-11 md:w-9`}>
+        ›
+      </Link>
     </div>
   );
 }
@@ -238,97 +314,125 @@ function TimeGrid({
   days,
   axisStart,
   axisEnd,
-  view,
+  hourPx,
+  viewParam,
   refDateStr,
 }: {
   days: DayData[];
   axisStart: number;
   axisEnd: number;
-  view: string;
+  hourPx: number;
+  viewParam: string;
   refDateStr: string;
 }) {
-  const gridHeight = (axisEnd - axisStart) * MIN_PX;
+  const minPx = hourPx / 60;
+  const gridHeight = (axisEnd - axisStart) * minPx;
   const hours: number[] = [];
   for (let h = axisStart; h <= axisEnd; h += 60) hours.push(h);
 
+  const single = days.length === 1;
+  // Deň: 1 stĺpec cez celú šírku (žiadny horizontálny scroll). Týždeň: kompaktné
+  // stĺpce s poistkou overflow-x-auto pre užšie desktopy.
+  const cols = single
+    ? "44px minmax(0,1fr)"
+    : `44px repeat(${days.length}, minmax(76px,1fr))`;
+  const minTap = hourPx >= 80 ? 44 : 22; // tap-target v dennom pohľade
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-panel">
+    <div
+      className={
+        "rounded-lg border border-line bg-panel " +
+        (single ? "" : "overflow-x-auto")
+      }
+    >
       <div
-        className="grid min-w-full"
-        style={{ gridTemplateColumns: `56px repeat(${days.length}, minmax(120px, 1fr))` }}
+        className={single ? "grid" : "grid min-w-full"}
+        style={{ gridTemplateColumns: cols }}
       >
-        {/* hlavičkový riadok */}
+        {/* hlavičkový riadok – jeden riadok: deň + počet */}
         <div className="border-b border-line" />
         {days.map((d) => (
           <div
             key={d.dateStr}
             className={
-              "border-b border-l border-line px-2 py-2 text-center " +
+              "flex items-center justify-center gap-1 border-b border-l border-line px-1.5 py-2 text-center " +
               (d.isToday ? "bg-gold/5" : "")
             }
           >
-            <div className={"text-sm font-medium " + (d.isToday ? "text-gold" : "text-cream")}>
-              {d.weekdayLabel} <span className="text-muted">{d.dayMonth}</span>
-            </div>
-            <div className="text-[11px] text-muted">{rezervacieLabel(d.bookings.length)}</div>
+            <span
+              className={
+                "text-xs font-medium " +
+                (d.isToday ? "text-gold" : "text-cream")
+              }
+            >
+              {d.weekdayShort} {d.dayMonth}
+            </span>
+            {d.bookings.length > 0 && (
+              <span className="rounded-full bg-gold/15 px-1.5 text-[10px] font-medium tabular-nums text-gold">
+                {d.bookings.length}
+              </span>
+            )}
           </div>
         ))}
 
-        {/* telo: časová os + stĺpce dní */}
+        {/* časová os */}
         <div className="relative" style={{ height: gridHeight }}>
           {hours.map((h) => (
             <div
               key={h}
-              className="absolute right-2 -translate-y-1/2 text-[10px] tabular-nums text-muted"
-              style={{ top: (h - axisStart) * MIN_PX }}
+              className="absolute right-1.5 -translate-y-1/2 text-[10px] tabular-nums text-muted"
+              style={{ top: (h - axisStart) * minPx }}
             >
               {minutesToHHMM(h)}
             </div>
           ))}
         </div>
+
+        {/* stĺpce dní */}
         {days.map((d) => (
           <div
             key={d.dateStr}
             className="relative border-l border-line"
             style={{
               height: gridHeight,
-              backgroundImage: `repeating-linear-gradient(to bottom, var(--color-line) 0, var(--color-line) 1px, transparent 1px, transparent ${HOUR_PX}px)`,
+              backgroundImage: `repeating-linear-gradient(to bottom, var(--color-line) 0, var(--color-line) 1px, transparent 1px, transparent ${hourPx}px)`,
             }}
           >
-            {/* tieňovanie pracovných hodín */}
             {d.whBlocks.map((b, i) => (
               <div
                 key={i}
                 className="absolute inset-x-0 bg-white/[0.015]"
                 style={{
-                  top: (b.startMinute - axisStart) * MIN_PX,
-                  height: (b.endMinute - b.startMinute) * MIN_PX,
+                  top: (b.startMinute - axisStart) * minPx,
+                  height: (b.endMinute - b.startMinute) * minPx,
                 }}
               />
             ))}
-            {/* prázdny deň */}
             {d.bookings.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center text-[11px] text-muted/70">
                 {d.isOpen ? "voľné" : "zatvorené"}
               </div>
             )}
-            {/* rezervácie */}
             {d.bookings.map((bk) => (
               <Link
                 key={bk.id}
-                href={`/admin/kalendar?view=${view}&date=${refDateStr}&booking=${bk.id}`}
+                href={`${href(viewParam, refDateStr)}&booking=${bk.id}`}
                 scroll={false}
-                className="absolute inset-x-1 overflow-hidden rounded-md border border-gold/50 bg-gold/10 px-2 py-1 text-left hover:border-gold hover:bg-gold/20"
+                className="absolute inset-x-0.5 overflow-hidden rounded-md border border-gold/50 bg-gold/10 px-1.5 py-0.5 text-left leading-tight hover:border-gold hover:bg-gold/20"
                 style={{
-                  top: (bk.startMin - axisStart) * MIN_PX,
-                  height: Math.max((bk.endMin - bk.startMin) * MIN_PX - 2, 22),
+                  top: (bk.startMin - axisStart) * minPx,
+                  height: Math.max((bk.endMin - bk.startMin) * minPx - 2, minTap),
                 }}
               >
-                <div className="text-[11px] font-semibold leading-tight text-gold">
+                <div className="text-[10px] font-semibold text-gold">
                   {bk.timeLabel}
                 </div>
-                <div className="truncate text-xs leading-tight text-cream">{bk.name}</div>
-                <div className="truncate text-[11px] leading-tight text-muted">{bk.service}</div>
+                <div className="truncate text-[11px] font-medium text-cream">
+                  {bk.name}
+                </div>
+                <div className="truncate text-[10px] text-muted">
+                  {bk.service}
+                </div>
               </Link>
             ))}
           </div>
@@ -342,11 +446,11 @@ function TimeGrid({
 
 function WeekList({
   days,
-  view,
+  viewParam,
   refDateStr,
 }: {
   days: DayData[];
-  view: string;
+  viewParam: string;
   refDateStr: string;
 }) {
   return (
@@ -360,27 +464,39 @@ function WeekList({
           }
         >
           <div className="flex items-baseline justify-between">
-            <span className={"font-medium " + (d.isToday ? "text-gold" : "text-cream")}>
-              {d.weekdayLabel} <span className="text-muted">{d.dayMonth}</span>
+            <span
+              className={
+                "font-medium " + (d.isToday ? "text-gold" : "text-cream")
+              }
+            >
+              {d.weekdayShort} <span className="text-muted">{d.dayMonth}</span>
             </span>
-            <span className="text-xs text-muted">{rezervacieLabel(d.bookings.length)}</span>
+            <span className="text-xs text-muted">
+              {rezervacieLabel(d.bookings.length)}
+            </span>
           </div>
           {d.bookings.length === 0 ? (
-            <p className="mt-2 text-sm text-muted/70">{d.isOpen ? "Voľný deň." : "Zatvorené."}</p>
+            <p className="mt-2 text-sm text-muted/70">
+              {d.isOpen ? "Voľný deň." : "Zatvorené."}
+            </p>
           ) : (
             <ul className="mt-2 space-y-1.5">
               {d.bookings.map((bk) => (
                 <li key={bk.id}>
                   <Link
-                    href={`/admin/kalendar?view=${view}&date=${refDateStr}&booking=${bk.id}`}
+                    href={`${href(viewParam, refDateStr)}&booking=${bk.id}`}
                     scroll={false}
-                    className="flex items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 hover:bg-gold/20"
+                    className="flex min-h-[44px] items-center gap-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 hover:bg-gold/20"
                   >
                     <span className="shrink-0 text-sm font-semibold tabular-nums text-gold">
                       {bk.timeLabel}
                     </span>
-                    <span className="truncate text-sm text-cream">{bk.name}</span>
-                    <span className="ml-auto shrink-0 text-xs text-muted">{bk.service}</span>
+                    <span className="truncate text-sm text-cream">
+                      {bk.name}
+                    </span>
+                    <span className="ml-auto shrink-0 text-xs text-muted">
+                      {bk.service}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -394,7 +510,13 @@ function WeekList({
 
 // ---- Detail rezervácie (modal) -------------------------------------------
 
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex justify-between gap-4 border-t border-line py-2 text-sm">
       <span className="text-muted">{label}</span>
@@ -405,7 +527,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 function BookingModal({
   booking,
-  view,
+  viewParam,
   refDateStr,
 }: {
   booking: {
@@ -423,7 +545,7 @@ function BookingModal({
       priceMaxCents: number | null;
     };
   };
-  view: string;
+  viewParam: string;
   refDateStr: string;
 }) {
   const s = utcToLocalParts(booking.startAt);
@@ -431,14 +553,21 @@ function BookingModal({
   const dayAnchor = localDateStringToUTC(s.dateStr)!;
   const dateLabel = formatDateOnly(dayAnchor);
   const timeLabel = `${minutesToHHMM(s.minutes)}–${minutesToHHMM(e.minutes)}`;
-  const durationMin = Math.round((booking.endAt.getTime() - booking.startAt.getTime()) / 60000);
-  const closeHref = href(view, refDateStr);
+  const durationMin = Math.round(
+    (booking.endAt.getTime() - booking.startAt.getTime()) / 60000,
+  );
+  const closeHref = href(viewParam, refDateStr);
   const isConfirmed = booking.status === "CONFIRMED";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       {/* backdrop – klik zavrie */}
-      <Link href={closeHref} scroll={false} aria-label="Zavrieť" className="absolute inset-0 bg-black/60" />
+      <Link
+        href={closeHref}
+        scroll={false}
+        aria-label="Zavrieť"
+        className="absolute inset-0 bg-black/60"
+      />
       <div
         role="dialog"
         aria-modal="true"
@@ -447,25 +576,43 @@ function BookingModal({
       >
         <div className="mb-3 flex items-start justify-between gap-4">
           <div>
-            <h2 id="booking-modal-title" className="text-lg font-semibold text-cream">{booking.customerName}</h2>
+            <h2
+              id="booking-modal-title"
+              className="text-lg font-semibold text-cream"
+            >
+              {booking.customerName}
+            </h2>
             {!isConfirmed && (
-              <span className="text-xs font-medium text-red-400">Zrušená rezervácia</span>
+              <span className="text-xs font-medium text-red-400">
+                Zrušená rezervácia
+              </span>
             )}
           </div>
-          <Link href={closeHref} scroll={false} className="text-muted hover:text-cream" aria-label="Zavrieť">
+          <Link
+            href={closeHref}
+            scroll={false}
+            className="text-muted hover:text-cream"
+            aria-label="Zavrieť"
+          >
             ✕
           </Link>
         </div>
 
         <div className="mb-4">
           <DetailRow label="Telefón">
-            <a href={`tel:${booking.customerPhone.replace(/\s/g, "")}`} className="text-gold hover:underline">
+            <a
+              href={`tel:${booking.customerPhone.replace(/\s/g, "")}`}
+              className="text-gold hover:underline"
+            >
               {booking.customerPhone}
             </a>
           </DetailRow>
           {booking.customerEmail && (
             <DetailRow label="E-mail">
-              <a href={`mailto:${booking.customerEmail}`} className="text-gold hover:underline">
+              <a
+                href={`mailto:${booking.customerEmail}`}
+                className="text-gold hover:underline"
+              >
                 {booking.customerEmail}
               </a>
             </DetailRow>
@@ -475,7 +622,10 @@ function BookingModal({
           <DetailRow label="Čas">{timeLabel}</DetailRow>
           <DetailRow label="Dĺžka">{durationMin} min</DetailRow>
           <DetailRow label="Cena">
-            {formatServicePrice(booking.service.priceCents, booking.service.priceMaxCents)}
+            {formatServicePrice(
+              booking.service.priceCents,
+              booking.service.priceMaxCents,
+            )}
           </DetailRow>
         </div>
 
@@ -488,12 +638,12 @@ function BookingModal({
               currentDateStr={s.dateStr}
               currentDateLabel={dateLabel}
               currentTimeLabel={minutesToHHMM(s.minutes)}
-              view={view}
+              view={viewParam}
               refDateStr={refDateStr}
             />
             <CancelButton
               id={booking.id}
-              view={view}
+              view={viewParam}
               date={refDateStr}
               confirmLabel={`${booking.customerName}, ${dateLabel} ${minutesToHHMM(s.minutes)}`}
             />

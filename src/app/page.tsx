@@ -25,7 +25,7 @@ export default async function HomePage() {
   const [services, workingHours] = await Promise.all([
     prisma.service.findMany({
       where: { active: true },
-      orderBy: { priceCents: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     prisma.workingHours.findMany({
       orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],

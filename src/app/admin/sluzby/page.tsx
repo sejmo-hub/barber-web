@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { formatServicePrice } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
 import { ServiceForm } from "./service-form";
-import { toggleService } from "./actions";
+import { toggleService, moveService } from "./actions";
 import { DeleteServiceButton } from "./delete-button";
 
 // Vždy čerstvé dáta (admin nástroj – žiadne cachovanie zoznamu).
@@ -18,7 +18,7 @@ export default async function ServicesPage({
 }) {
   const sp = await searchParams;
   const services = await prisma.service.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: { _count: { select: { bookings: true } } },
   });
   const editing = sp.edit ? services.find((s) => s.id === sp.edit) : undefined;
@@ -48,6 +48,7 @@ export default async function ServicesPage({
             <table className="w-full text-left text-sm">
               <thead className="border-b border-line text-muted">
                 <tr>
+                  <th className="px-2 py-3 font-medium">Poradie</th>
                   <th className="px-4 py-3 font-medium">Názov</th>
                   <th className="px-4 py-3 font-medium">Dĺžka</th>
                   <th className="px-4 py-3 font-medium">Cena</th>
@@ -57,8 +58,52 @@ export default async function ServicesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {services.map((s) => (
+                {services.map((s, i) => (
                   <tr key={s.id} className={s.id === editing?.id ? "bg-gold/5" : ""}>
+                    <td className="px-2 py-3">
+                      <div className="flex items-center gap-1">
+                        {i > 0 ? (
+                          <form action={moveService}>
+                            <input type="hidden" name="id" value={s.id} />
+                            <input type="hidden" name="dir" value="up" />
+                            <SubmitButton
+                              ariaLabel={`Posunúť ${s.name} vyššie`}
+                              pendingText="…"
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-line text-cream hover:border-gold/60 hover:text-gold"
+                            >
+                              ↑
+                            </SubmitButton>
+                          </form>
+                        ) : (
+                          <span
+                            aria-hidden
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-line/40 text-muted/30"
+                          >
+                            ↑
+                          </span>
+                        )}
+                        {i < services.length - 1 ? (
+                          <form action={moveService}>
+                            <input type="hidden" name="id" value={s.id} />
+                            <input type="hidden" name="dir" value="down" />
+                            <SubmitButton
+                              ariaLabel={`Posunúť ${s.name} nižšie`}
+                              pendingText="…"
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-line text-cream hover:border-gold/60 hover:text-gold"
+                            >
+                              ↓
+                            </SubmitButton>
+                          </form>
+                        ) : (
+                          <span
+                            aria-hidden
+                            className="flex h-7 w-7 items-center justify-center rounded-md border border-line/40 text-muted/30"
+                          >
+                            ↓
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-cream">{s.name}</div>
                       {s.description && (

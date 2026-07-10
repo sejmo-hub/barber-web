@@ -35,7 +35,7 @@ export default async function BookingPage({
   // rozsahom) sa v rezervačnom toku nezobrazujú.
   const services = await prisma.service.findMany({
     where: { active: true, bookable: true },
-    orderBy: { name: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
   const service = sp.service
     ? services.find((s) => s.id === sp.service)

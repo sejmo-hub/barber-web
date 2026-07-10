@@ -27,6 +27,7 @@ model Service {
   priceMaxCents Int? // horná hranica → ak vyplnené, cena je rozsah "od–do"
   active        Boolean  @default(true)
   bookable      Boolean  @default(true) // dá sa rezervovať online (admin nastaví)
+  sortOrder     Int      @default(0) // poradie zobrazenia (admin, hlavná, rezervácia)
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   bookings Booking[]
