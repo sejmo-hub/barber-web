@@ -4,6 +4,8 @@ export type BookingEmailData = {
   serviceName: string;
   dateLabel: string;
   time: string;
+  startAt: Date; // zmrazený UTC začiatok (pre .ics)
+  endAt: Date; // zmrazený UTC koniec (pre .ics)
   durationMin: number;
   priceLabel: string;
   customerName: string;
@@ -36,6 +38,13 @@ export async function sendBookingEmails(data: BookingEmailData): Promise<void> {
         to: barberEmail,
         subject: `Simon'S The Barber — nová rezervácia: ${data.serviceName}, ${data.dateLabel} ${data.time}`,
         html: barberHtml(data),
+        attachments: [
+          {
+            filename: "rezervacia.ics",
+            content: Buffer.from(buildBookingIcs(data), "utf-8"),
+            contentType: "text/calendar",
+          },
+        ],
       });
       if (error) console.error("[mail] barberovi zlyhal:", error);
       else console.log(`[mail] barberovi odoslaný → ${barberEmail} (id ${res?.id})`);
@@ -64,6 +73,49 @@ export async function sendBookingEmails(data: BookingEmailData): Promise<void> {
       console.error("[mail] zákazníkovi výnimka:", e);
     }
   }
+}
+
+// --- .ics kalendárová príloha (bez externej knižnice) ---------------------
+
+// UTC Date → iCalendar formát "YYYYMMDDTHHMMSSZ".
+function icsDateUtc(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+// Escapovanie textu podľa RFC 5545 (poradie dôležité: najprv spätné lomítko).
+function icsEscape(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+}
+
+// Vygeneruje validný .ics (VCALENDAR/VEVENT) z booking dát. Riadky sú CRLF.
+// Používa zmrazené startAt/endAt (UTC) – nie prepočet z aktuálneho trvania.
+export function buildBookingIcs(data: BookingEmailData): string {
+  const uid = `${data.startAt.getTime()}-${data.customerPhone.replace(/\D/g, "")}@simonsthebarber.sk`;
+  const summary = icsEscape(`${data.serviceName} — ${data.customerName}`);
+  const description = icsEscape(
+    `Telefón: ${data.customerPhone}\nCena: ${data.priceLabel}`,
+  );
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Simon'S The Barber//Rezervacie//SK",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${icsDateUtc(new Date())}`,
+    `DTSTART:${icsDateUtc(data.startAt)}`,
+    `DTEND:${icsDateUtc(data.endAt)}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return lines.join("\r\n") + "\r\n";
 }
 
 // --- HTML šablóny ---------------------------------------------------------

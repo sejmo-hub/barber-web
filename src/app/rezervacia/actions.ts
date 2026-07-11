@@ -206,6 +206,8 @@ export async function createBooking(
       serviceName: service.name,
       dateLabel,
       time,
+      startAt,
+      endAt,
       durationMin: service.durationMin,
       priceLabel: formatServicePrice(service.priceCents, service.priceMaxCents),
       customerName: name,
