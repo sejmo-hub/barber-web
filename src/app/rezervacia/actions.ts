@@ -171,8 +171,9 @@ export async function createBooking(
   }
 
   // 4) + 5) Zápis so zachytením EXCLUDE constraintu (race condition dvoch naraz).
+  let bookingId: string;
   try {
-    await prisma.booking.create({
+    const created = await prisma.booking.create({
       data: {
         serviceId: service.id,
         customerName: name,
@@ -182,7 +183,9 @@ export async function createBooking(
         endAt,
         status: BookingStatus.CONFIRMED,
       },
+      select: { id: true },
     });
+    bookingId = created.id;
   } catch (err) {
     if (isOverlapError(err)) {
       return {
@@ -203,6 +206,7 @@ export async function createBooking(
   // zhodiť už uloženú rezerváciu – preto celé v try/catch, pri zlyhaní len log.
   try {
     await sendBookingEmails({
+      bookingId,
       serviceName: service.name,
       dateLabel,
       time,

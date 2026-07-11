@@ -1,6 +1,8 @@
 import { Resend } from "resend";
+import { signCancelToken } from "@/lib/cancel-token";
 
 export type BookingEmailData = {
+  bookingId: string; // na zrušovací odkaz v maile zákazníkovi
   serviceName: string;
   dateLabel: string;
   time: string;
@@ -57,12 +59,24 @@ export async function sendBookingEmails(data: BookingEmailData): Promise<void> {
 
   // 2) Zákazníkovi – len ak zadal e-mail.
   if (data.customerEmail) {
+    // Zrušovací odkaz (absolútny, cez APP_URL). Ak APP_URL chýba alebo token
+    // zlyhá, odkaz sa vynechá – e-mail sa aj tak pošle (len bez cancel linku).
+    let cancelUrl: string | null = null;
+    const appUrl = process.env.APP_URL;
+    if (appUrl) {
+      try {
+        const token = await signCancelToken(data.bookingId, data.startAt);
+        cancelUrl = `${appUrl.replace(/\/$/, "")}/zrusit/${token}`;
+      } catch (e) {
+        console.error("[mail] cancel token zlyhal (odkaz vynechaný):", e);
+      }
+    }
     try {
       const { data: res, error } = await resend.emails.send({
         from,
         to: data.customerEmail,
         subject: `Simon'S The Barber — potvrdenie rezervácie ${data.dateLabel} ${data.time}`,
-        html: customerHtml(data),
+        html: customerHtml(data, cancelUrl),
       });
       if (error) console.error("[mail] zákazníkovi zlyhal:", error);
       else
@@ -174,7 +188,7 @@ function barberHtml(d: BookingEmailData): string {
   );
 }
 
-function customerHtml(d: BookingEmailData): string {
+function customerHtml(d: BookingEmailData, cancelUrl: string | null): string {
   const rows = [
     detailRow("Služba", d.serviceName),
     detailRow("Dátum", d.dateLabel),
@@ -182,15 +196,24 @@ function customerHtml(d: BookingEmailData): string {
     detailRow("Dĺžka", `${d.durationMin} min`),
     detailRow("Cena", d.priceLabel),
   ];
+  // Zrušovací odkaz len ak máme absolútnu URL; inak pôvodná veta (nič nespadne).
+  const cancelBlock = cancelUrl
+    ? `<div style="margin:20px 0 0;">
+         <a href="${cancelUrl}" style="display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:9px 16px;color:#374151;text-decoration:none;font-size:13px;font-weight:600;">Zrušiť rezerváciu</a>
+       </div>
+       <p style="margin:8px 0 0;color:#9ca3af;font-size:12px;">
+         Zrušiť môžeš najneskôr hodinu pred termínom.
+       </p>`
+    : `<p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
+         Ak sa nemôžeš dostaviť, prosím daj nám vedieť.
+       </p>`;
   return wrap(
     `<h1 style="margin:0;font-size:20px;">Ďakujeme za rezerváciu!</h1>
      <p style="margin:8px 0 0;color:#374151;font-size:14px;">
        Ahoj ${escapeHtml(d.customerName)}, tvoja rezervácia je potvrdená. Tešíme sa na teba.
      </p>
      ${detailsTable(rows)}
-     <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
-       Ak sa nemôžeš dostaviť, prosím daj nám vedieť.
-     </p>`,
+     ${cancelBlock}`,
   );
 }
 
@@ -257,5 +280,103 @@ function rescheduleHtml(d: RescheduleEmailData): string {
      <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
        Ak ti nový termín nevyhovuje, daj nám prosím vedieť.
      </p>`,
+  );
+}
+
+// --- Zrušenie rezervácie (obom stranám) -----------------------------------
+
+export type CancellationEmailData = {
+  serviceName: string;
+  dateLabel: string;
+  time: string;
+  customerName: string;
+  customerEmail: string | null; // zákazníkovi len ak zadal e-mail
+};
+
+// Po zrušení: barberovi vždy, zákazníkovi len ak má e-mail. Každý send má vlastný
+// try/catch – volajúci (softCancelBooking) to má navyše v try/catch, aby zlyhanie
+// odoslania NIKDY nezhodilo samotné zrušenie.
+export async function sendCancellationEmails(
+  data: CancellationEmailData,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM;
+  const barberEmail = process.env.BARBER_EMAIL;
+  if (!apiKey || !from) {
+    console.warn(
+      "[mail] RESEND_API_KEY alebo MAIL_FROM nie je nastavené – e-maily o zrušení preskočené.",
+    );
+    return;
+  }
+  const resend = new Resend(apiKey);
+
+  // 1) Barberovi – vždy (termín sa uvoľnil).
+  if (barberEmail) {
+    try {
+      const { data: res, error } = await resend.emails.send({
+        from,
+        to: barberEmail,
+        subject: `Simon'S The Barber — zrušená rezervácia: ${data.serviceName}, ${data.dateLabel} ${data.time}`,
+        html: cancelBarberHtml(data),
+      });
+      if (error) console.error("[mail] zrušenie barberovi zlyhal:", error);
+      else
+        console.log(
+          `[mail] zrušenie barberovi odoslaný → ${barberEmail} (id ${res?.id})`,
+        );
+    } catch (e) {
+      console.error("[mail] zrušenie barberovi výnimka:", e);
+    }
+  }
+
+  // 2) Zákazníkovi – len ak zadal e-mail. Bez zrušovacieho odkazu (už je zrušená).
+  if (data.customerEmail) {
+    try {
+      const { data: res, error } = await resend.emails.send({
+        from,
+        to: data.customerEmail,
+        subject: `Simon'S The Barber — zrušenie rezervácie ${data.dateLabel} ${data.time}`,
+        html: cancelCustomerHtml(data),
+      });
+      if (error) console.error("[mail] zrušenie zákazníkovi zlyhal:", error);
+      else
+        console.log(
+          `[mail] zrušenie zákazníkovi odoslaný → ${data.customerEmail} (id ${res?.id})`,
+        );
+    } catch (e) {
+      console.error("[mail] zrušenie zákazníkovi výnimka:", e);
+    }
+  }
+}
+
+function cancelCustomerHtml(d: CancellationEmailData): string {
+  const rows = [
+    detailRow("Služba", d.serviceName),
+    detailRow("Dátum", d.dateLabel),
+    detailRow("Čas", d.time),
+  ];
+  return wrap(
+    `<h1 style="margin:0;font-size:20px;">Rezervácia zrušená</h1>
+     <p style="margin:8px 0 0;color:#374151;font-size:14px;">
+       Ahoj ${escapeHtml(d.customerName)}, tvoja rezervácia bola zrušená.
+     </p>
+     ${detailsTable(rows)}
+     <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
+       Ak sa chceš objednať znova, radi ťa privítame.
+     </p>`,
+  );
+}
+
+function cancelBarberHtml(d: CancellationEmailData): string {
+  const rows = [
+    detailRow("Meno", d.customerName),
+    detailRow("Služba", d.serviceName),
+    detailRow("Dátum", d.dateLabel),
+    detailRow("Čas", d.time),
+  ];
+  return wrap(
+    `<h1 style="margin:0;font-size:20px;">Rezervácia zrušená</h1>
+     <p style="margin:8px 0 0;color:#6b7280;font-size:14px;">Termín sa uvoľnil.</p>
+     ${detailsTable(rows)}`,
   );
 }

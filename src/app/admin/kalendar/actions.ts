@@ -19,6 +19,7 @@ import {
 import { computeFreeSlots, validateRescheduleSlot } from "@/lib/slots";
 import { sendRescheduleEmail } from "@/lib/email";
 import { requireAdmin } from "@/lib/auth";
+import { softCancelBooking } from "@/lib/bookings";
 
 // Soft-cancel: rezerváciu NEmažeme, len prepneme status na CANCELLED (história
 // ostáva). computeFreeSlots ráta len CONFIRMED, takže zrušený čas sa automaticky
@@ -30,13 +31,7 @@ export async function cancelBooking(formData: FormData): Promise<void> {
   const date = String(formData.get("date") ?? "");
 
   if (id) {
-    // updateMany nehádže, ak by id neexistovalo.
-    await prisma.booking.updateMany({
-      where: { id, status: BookingStatus.CONFIRMED },
-      data: { status: BookingStatus.CANCELLED },
-    });
-    revalidatePath("/admin/kalendar");
-    revalidatePath("/rezervacia"); // booking flow uvidí uvoľnený termín
+    await softCancelBooking(id); // zdieľané jadro (aj verejné /zrusit)
   }
 
   const q = new URLSearchParams();
