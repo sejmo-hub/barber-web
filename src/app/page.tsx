@@ -385,6 +385,11 @@ export default async function HomePage() {
             © 2026 Simon&#39;S The Barber
           </p>
         </div>
+        <div className="relative border-t border-line/40 py-4 text-center">
+          <p className="font-mono text-[10px] tracking-wider text-muted/60">
+            Made by Setori
+          </p>
+        </div>
       </footer>
     </div>
   );
