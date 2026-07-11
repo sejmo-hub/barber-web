@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hhmmToMinutes } from "@/lib/format";
+import { requireAdmin } from "@/lib/auth";
 
 export type HoursFormState = { error?: string; success?: string };
 
@@ -13,6 +14,7 @@ export async function addBlock(
   _prev: HoursFormState,
   formData: FormData,
 ): Promise<HoursFormState> {
+  await requireAdmin();
   const weekday = Number.parseInt(String(formData.get("weekday") ?? ""), 10);
   if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
     return { error: "Neplatný deň." };
@@ -47,6 +49,7 @@ export async function addBlock(
 // Zmazanie časového bloku. deleteMany = idempotentné (dvojklik/stará karta na
 // už zmazanom bloku nespôsobí výnimku P2025).
 export async function deleteBlock(formData: FormData): Promise<void> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

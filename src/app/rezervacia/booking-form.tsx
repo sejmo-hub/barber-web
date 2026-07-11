@@ -93,6 +93,23 @@ export function BookingForm({
       <input type="hidden" name="date" value={dateStr} />
       <input type="hidden" name="slot" value={slot} />
 
+      {/* Honeypot proti botom: mimo obrazovky, skryté pre čítačky aj klávesnicu.
+          Ľudia ho nevyplnia; ak príde vyplnené, server rezerváciu odmietne. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden"
+      >
+        <label>
+          Nechaj toto pole prázdne
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </label>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="mb-1.5 block font-medium text-cream">

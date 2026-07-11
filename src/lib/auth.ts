@@ -8,3 +8,13 @@ export async function getSession(): Promise<{ sub: string } | null> {
   if (!token) return null;
   return verifySession(token);
 }
+
+// Obranná hĺbka: každá admin server action ju má zavolať ako PRVÝ riadok.
+// Middleware síce chráni /admin/* cesty, ale server actions sú verejné POST
+// endpointy – autorizáciu preto overujeme aj priamo v handleri (odporúčanie
+// Next.js). Ak nie je platná session, akcia sa preruší (útočník = bez session).
+export async function requireAdmin(): Promise<{ sub: string }> {
+  const session = await getSession();
+  if (!session) throw new Error("Neautorizované.");
+  return session;
+}

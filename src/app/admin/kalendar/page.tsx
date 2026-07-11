@@ -610,7 +610,7 @@ function BookingModal({
           {booking.customerEmail && (
             <DetailRow label="E-mail">
               <a
-                href={`mailto:${booking.customerEmail}`}
+                href={`mailto:${encodeURIComponent(booking.customerEmail)}`}
                 className="text-gold hover:underline"
               >
                 {booking.customerEmail}

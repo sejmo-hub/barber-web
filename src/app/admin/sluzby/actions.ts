@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 export type ServiceFormState = { error?: string; success?: string };
 
@@ -82,6 +83,7 @@ export async function createService(
   _prev: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
+  await requireAdmin();
   const p = parseServiceForm(formData);
   if (!p.ok) return { error: p.error };
 
@@ -94,6 +96,7 @@ export async function updateService(
   _prev: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Chýba ID služby." };
 
@@ -108,6 +111,7 @@ export async function updateService(
 // Posun služby v poradí (šípky hore/dole). Prehodí ju so susedom a prečísluje
 // všetky sortOrdery na 1..N (kontiguálne, stabilné aj keď boli pôvodne rovnaké/0).
 export async function moveService(formData: FormData): Promise<void> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const dir = String(formData.get("dir") ?? "");
   if (!id || (dir !== "up" && dir !== "down")) return;
@@ -136,6 +140,7 @@ export async function moveService(formData: FormData): Promise<void> {
 
 // Prepnutie active (aktivovať / deaktivovať).
 export async function toggleService(formData: FormData): Promise<void> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -153,6 +158,7 @@ export async function toggleService(formData: FormData): Promise<void> {
 // FK onDelete: Restrict chráni kalendár/históriu. Vopred skontrolujeme počet
 // rezervácií: ak nejaké má, presmerujeme so ?delErr=<id> a stránka ukáže hlášku.
 export async function deleteService(formData: FormData): Promise<void> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

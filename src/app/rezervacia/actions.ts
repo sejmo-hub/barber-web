@@ -9,8 +9,10 @@ import {
   todayLocalStartUTC,
   formatDateOnly,
 } from "@/lib/date";
+import { headers } from "next/headers";
 import { computeFreeSlots, MIN_LEAD_TIME_MIN } from "@/lib/slots";
 import { sendBookingEmails } from "@/lib/email";
+import { rateLimit } from "@/lib/rate-limit";
 
 export type BookingResult =
   | { status: "idle" }
@@ -20,8 +22,21 @@ export type BookingResult =
       summary: { serviceName: string; dateLabel: string; time: string };
     };
 
-// Jednoduchá kontrola formátu e-mailu (pole je nepovinné).
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Kontrola formátu e-mailu (pole je nepovinné). Prísnejšia než holé "@.": zakazuje
+// ? & = , ; < > " ' medzery aj v lokálnej časti/doméne → bráni mailto param
+// injection v admine a zjavne nezmyselné adresy.
+const EMAIL_RE = /^[^\s@,;:<>()"'?&=]+@[^\s@,;:<>()"'?&=]+\.[a-zA-Z]{2,}$/;
+
+// Dĺžkové stropy (klientske maxLength nie je bezpečnostná hranica – priamy POST
+// ich obíde, preto validujeme aj server-side).
+const MAX_NAME = 100;
+const MAX_EMAIL = 254;
+
+// Anti-spam limity.
+const MAX_FUTURE_PER_PHONE = 3; // max aktívnych budúcich rezervácií na číslo
+const IP_MAX = 5; // max rezervácií na IP za okno
+const PHONE_MAX = 3; // max rezervácií na číslo za okno
+const RL_WINDOW_MS = 10 * 60_000; // 10 minút
 
 // Odoslanie rezervácie. Nikdy neverí hodnotám z klienta – trvanie aj cenu
 // berie z DB, čas prepočítava cez TZ helpery a slot znova validuje server-side.
@@ -32,30 +47,86 @@ export async function createBooking(
   const serviceId = String(formData.get("serviceId") ?? "");
   const dateStr = String(formData.get("date") ?? "");
   const time = String(formData.get("slot") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
+  // Meno: odstráň riadiace a bidi znaky (rozbíjajú zobrazenie v admine/e-maile).
+  const name = String(formData.get("name") ?? "")
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+    .trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const emailRaw = String(formData.get("email") ?? "").trim();
+  const honeypot = String(formData.get("website") ?? "").trim();
 
-  // --- validácia vstupov od zákazníka ---
-  if (name.length < 2) {
-    return { status: "error", message: "Zadaj meno (aspoň 2 znaky)." };
-  }
-  // Telefón: povoľ +, medzery a bežné oddeľovače; požaduj aspoň 9 číslic.
-  const phoneNorm = phone.replace(/[\s()/.\-]/g, "");
-  if (!/^\+?\d{9,}$/.test(phoneNorm)) {
+  // --- Anti-bot / anti-spam (pred akoukoľvek DB prácou) ---
+  // Honeypot: skryté pole "website" – ľudia ho nevyplnia, boti áno. Tichá chyba.
+  if (honeypot !== "") {
     return {
       status: "error",
-      message: "Zadaj platné telefónne číslo (aspoň 9 číslic).",
+      message: "Rezerváciu sa nepodarilo uložiť. Skús to prosím znova.",
+    };
+  }
+  // Rate-limit podľa IP (best-effort). Chytá hrubý flood aj pri rotácii čísel.
+  const ip =
+    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!rateLimit(`booking:ip:${ip}`, IP_MAX, RL_WINDOW_MS).ok) {
+    return {
+      status: "error",
+      message:
+        "Priveľa rezervácií z tohto zariadenia. Skús to prosím o pár minút.",
+    };
+  }
+
+  // --- validácia vstupov od zákazníka ---
+  if (name.length < 2 || name.length > MAX_NAME) {
+    return { status: "error", message: "Zadaj meno (2 – 100 znakov)." };
+  }
+  // Telefón: povoľ +, medzery a bežné oddeľovače; normalizuj na +/číslice.
+  const phoneNorm = phone.replace(/[\s()/.\-]/g, "");
+  if (!/^\+?\d{9,15}$/.test(phoneNorm)) {
+    return {
+      status: "error",
+      message: "Zadaj platné telefónne číslo (9 – 15 číslic).",
     };
   }
   // E-mail je nepovinný – validuj len ak je vyplnený.
-  if (emailRaw !== "" && !EMAIL_RE.test(emailRaw)) {
+  if (
+    emailRaw.length > MAX_EMAIL ||
+    (emailRaw !== "" && !EMAIL_RE.test(emailRaw))
+  ) {
     return {
       status: "error",
       message: "Zadaj platný e-mail alebo pole nechaj prázdne.",
     };
   }
   const customerEmail = emailRaw === "" ? null : emailRaw;
+
+  // --- Dedup / anti-spam podľa telefónu (DB počítadlo) ---
+  const nowMs = Date.now();
+  const recentByPhone = await prisma.booking.count({
+    where: {
+      customerPhone: phoneNorm,
+      createdAt: { gte: new Date(nowMs - RL_WINDOW_MS) },
+    },
+  });
+  if (recentByPhone >= PHONE_MAX) {
+    return {
+      status: "error",
+      message:
+        "Z tohto čísla prišlo priveľa rezervácií za krátky čas. Skús to prosím neskôr.",
+    };
+  }
+  const futureByPhone = await prisma.booking.count({
+    where: {
+      customerPhone: phoneNorm,
+      status: BookingStatus.CONFIRMED,
+      startAt: { gte: new Date(nowMs) },
+    },
+  });
+  if (futureByPhone >= MAX_FUTURE_PER_PHONE) {
+    return {
+      status: "error",
+      message:
+        "Na toto číslo už evidujeme 3 aktívne rezervácie. Ak potrebuješ ďalší termín, ozvi sa nám telefonicky.",
+    };
+  }
 
   const dayAnchor = localDateStringToUTC(dateStr);
   const minutes = hhmmToMinutes(time);
@@ -106,7 +177,7 @@ export async function createBooking(
         serviceId: service.id,
         customerName: name,
         customerEmail,
-        customerPhone: phone,
+        customerPhone: phoneNorm,
         startAt,
         endAt,
         status: BookingStatus.CONFIRMED,
@@ -138,7 +209,7 @@ export async function createBooking(
       durationMin: service.durationMin,
       priceLabel: formatServicePrice(service.priceCents, service.priceMaxCents),
       customerName: name,
-      customerPhone: phone,
+      customerPhone: phoneNorm,
       customerEmail,
     });
   } catch (mailErr) {

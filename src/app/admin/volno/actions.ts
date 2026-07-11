@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hhmmToMinutes } from "@/lib/format";
 import { localDateStringToUTC, todayLocalStartUTC } from "@/lib/date";
+import { requireAdmin } from "@/lib/auth";
 
 export type TimeOffFormState = { error?: string; success?: string };
 
@@ -14,6 +15,7 @@ export async function createTimeOff(
   _prev: TimeOffFormState,
   formData: FormData,
 ): Promise<TimeOffFormState> {
+  await requireAdmin();
   const date = localDateStringToUTC(String(formData.get("date") ?? ""));
   if (!date) {
     return { error: "Dátum je povinný a musí byť platný." };
@@ -51,6 +53,7 @@ export async function createTimeOff(
 // Zmazanie dňa voľna. deleteMany = idempotentné (dvojklik/stará karta na už
 // zmazanom zázname nespôsobí výnimku P2025).
 export async function deleteTimeOff(formData: FormData): Promise<void> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

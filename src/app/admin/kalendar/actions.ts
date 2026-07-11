@@ -18,11 +18,13 @@ import {
 } from "@/lib/format";
 import { computeFreeSlots, validateRescheduleSlot } from "@/lib/slots";
 import { sendRescheduleEmail } from "@/lib/email";
+import { requireAdmin } from "@/lib/auth";
 
 // Soft-cancel: rezerváciu NEmažeme, len prepneme status na CANCELLED (história
 // ostáva). computeFreeSlots ráta len CONFIRMED, takže zrušený čas sa automaticky
 // znova stane voľným vo verejnom booking flow.
 export async function cancelBooking(formData: FormData): Promise<void> {
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
   const view = String(formData.get("view") ?? "week");
   const date = String(formData.get("date") ?? "");
@@ -55,6 +57,7 @@ export async function fetchRescheduleSlots(
   bookingId: string,
   dateStr: string,
 ): Promise<{ slots: string[]; error?: string }> {
+  await requireAdmin();
   const dayAnchor = localDateStringToUTC(dateStr);
   if (!dayAnchor) return { slots: [], error: "Neplatný dátum." };
 
@@ -80,6 +83,7 @@ export async function rescheduleBooking(
   _prev: RescheduleResult,
   formData: FormData,
 ): Promise<RescheduleResult> {
+  await requireAdmin();
   const bookingId = String(formData.get("bookingId") ?? "");
   const newDate = String(formData.get("newDate") ?? "");
   const newSlot = String(formData.get("newSlot") ?? "");
