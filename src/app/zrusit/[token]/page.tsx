@@ -44,14 +44,16 @@ function Message({
   text,
 }: {
   heading: string;
-  text: string;
+  text: React.ReactNode;
 }) {
   return (
     <>
       <h1 className="font-display text-3xl uppercase leading-none text-cream">
         {heading}
       </h1>
-      <p className="mt-4 text-sm text-muted">{text}</p>
+      <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-muted">
+        {text}
+      </p>
       <Link
         href="/"
         className="mt-8 inline-block font-mono text-xs uppercase tracking-widest text-muted transition-colors hover:text-gold"
@@ -76,7 +78,20 @@ export default async function CancelPage({
       <Shell>
         <Message
           heading="Odkaz neplatný"
-          text="Tento odkaz na zrušenie je neplatný alebo expiroval — rezerváciu už nie je možné zrušiť online (menej ako hodinu pred termínom). Ak potrebuješ termín zrušiť, ozvi sa nám telefonicky."
+          text={
+            <>
+              Tento odkaz je neplatný alebo už vypršal — online sa dá zrušiť
+              najneskôr hodinu pred termínom. Ak chceš termín zrušiť alebo
+              presunúť, zavolaj nám na{" "}
+              <a
+                href="tel:+421944469217"
+                className="text-gold hover:underline"
+              >
+                0944 469 217
+              </a>
+              .
+            </>
+          }
         />
       </Shell>
     );
