@@ -25,8 +25,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  // TODO: nastav reálnu doménu (kvôli absolútnym OG/canonical URL).
-  metadataBase: new URL("https://simons-the-barber.sk"),
+  metadataBase: new URL("https://simonsthebarber.sk"),
   title: {
     default: "Simon'S The Barber — Kuklov | Pánsky barbershop",
     template: "%s | Simon'S The Barber",

@@ -23,6 +23,7 @@ const PHOTOS: { src: string; w: number; h: number }[] = [
   { src: "/galeria/strih-15.jpg", w: 1179, h: 2556 },
   { src: "/galeria/strih-16.jpg", w: 1179, h: 1738 },
   { src: "/galeria/strih-17.jpg", w: 1179, h: 1634 },
+  { src: "/galeria/strih-18.jpg", w: 1180, h: 1572 },
 ];
 
 const INITIAL = 6;
