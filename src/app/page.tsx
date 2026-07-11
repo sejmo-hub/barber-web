@@ -529,7 +529,7 @@ function SectionHead({
         <span className="font-mono text-xs uppercase tracking-[0.3em] text-gold">
           {overline}
         </span>
-        <h2 className="mt-3 font-display text-5xl uppercase leading-[0.95] text-cream sm:text-6xl sm:leading-[0.85] md:text-7xl">
+        <h2 className="mt-3 font-display text-5xl uppercase leading-[1.1] text-cream sm:text-6xl sm:leading-[0.85] md:text-7xl">
           {title}
         </h2>
       </div>
